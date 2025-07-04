@@ -211,22 +211,169 @@ def show_design_event_ui(data, col1, col2):
 
             with tab1:
                 st.subheader("Flow Time Series Analysis")
-                all_locs = sorted(model_data['location'].dropna().unique())
-                selected_loc = st.selectbox("Select Location to Plot:", all_locs, key="design_loc_selector")
-
-                if selected_loc:
-                    # Defensive check for the 'datetime' column
-                    # The data should be indexed by datetime from the packaging script
-                    if model_data.index.name == 'datetime':
+                
+                # Get location indices and map to human-readable names
+                try:
+                    from rsc.location_index import lookup_name
+                    all_locs = sorted(model_data['location'].dropna().unique())
+                    # Convert location indices to names, falling back to index if name not found
+                    loc_names = {loc: lookup_name(int(loc)) if str(loc).isdigit() else loc for loc in all_locs}
+                    # Sort locations by their human-readable names
+                    sorted_locs = sorted(all_locs, key=lambda x: loc_names.get(x, str(x)))
+                    
+                    # Create mapping for display and selection
+                    display_names = [f"{loc_names.get(loc, 'Unknown')} (ID: {loc})" for loc in sorted_locs]
+                    loc_to_display = dict(zip(sorted_locs, display_names))
+                    
+                    selected_display = st.selectbox(
+                        "Select Location to Plot:",
+                        options=display_names,
+                        key="design_loc_selector"
+                    )
+                    
+                    # Extract the original location ID from the selected display name
+                    selected_loc = next((loc for loc, name in loc_to_display.items() if name == selected_display), None)
+                    
+                    if selected_loc:
+                        # Get the full data for the selected location
+                        plot_data = model_data[model_data['location'] == selected_loc].copy()
+                        
+                        if not plot_data.empty and model_data.index.name == 'datetime':
+                            # Get unique ensemble members
+                            available_ensembles = sorted(plot_data['ensemble'].unique())
+                            
+                            # Add ensemble selector with on_change to trigger rerun
+                            selected_ensemble = st.selectbox(
+                                "Select Ensemble Member:",
+                                options=available_ensembles,
+                                format_func=lambda x: f"Ensemble {x}" if pd.notna(x) else "All Ensembles",
+                                key=f"ensemble_selector_{selected_loc}",
+                                on_change=lambda: st.session_state.update({"force_rerun": True})
+                            )
+                            
+                            # Force a rerun if the ensemble selection changed
+                            if st.session_state.get("force_rerun", False):
+                                st.session_state["force_rerun"] = False
+                                st.rerun()
+                            
+                            # Filter data by selected ensemble if not 'All'
+                            if pd.notna(selected_ensemble):
+                                plot_data = plot_data[plot_data['ensemble'] == selected_ensemble]
+                            
+                            # Create a clean DataFrame with flow rate and other relevant columns
+                            plot_df = pd.DataFrame({
+                                'datetime': plot_data.index,
+                                'flow_rate_m3s': plot_data['flow_rate'].clip(lower=0),
+                                'climate_scenario': plot_data.get('climate_scenario', ''),
+                                'ensemble': plot_data.get('ensemble', ''),
+                                'event_id': plot_data.get('event_id', '')
+                            }).set_index('datetime')
+                            
+                            # Ensure unique datetime index and drop NA values
+                            if plot_df.index.duplicated().any():
+                                # If there are still duplicates (e.g., from multiple runs), take the first occurrence
+                                plot_df = plot_df[~plot_df.index.duplicated(keep='first')]
+                            
+                            # Drop any rows with NA values in the flow rate column
+                            plot_df = plot_df.dropna(subset=['flow_rate_m3s'])
+                            
+                            # Display the data table
+                            st.subheader("Flow Time Series Data")
+                            st.dataframe(plot_df, use_container_width=True)
+                            
+                            # Add download button for CSV
+                            csv = plot_df.reset_index().to_csv(index=False).encode('utf-8')
+                            st.download_button(
+                                label="Download CSV",
+                                data=csv,
+                                file_name=f"flow_data_location_{selected_loc}_ensemble_{selected_ensemble if pd.notna(selected_ensemble) else 'all'}.csv",
+                                mime="text/csv",
+                                key=f"download_{selected_loc}_{selected_ensemble}"
+                            )
+                            
+                            # Create the chart with y-axis starting at 0
+                            st.subheader("Flow Rate Visualization")
+                            
+                            # Get all ensemble data for background, excluding Ensemble 0
+                            all_ensembles_data = model_data[
+                                (model_data['location'] == selected_loc) & 
+                                (model_data['ensemble'] != 0)  # Exclude Ensemble 0
+                            ].copy()
+                            all_ensembles_data = all_ensembles_data[~all_ensembles_data.index.duplicated(keep='first')]
+                            all_ensembles_data = all_ensembles_data.dropna(subset=['flow_rate'])
+                            
+                            # Create a combined DataFrame with ensemble info
+                            all_ensembles_df = pd.DataFrame({
+                                'datetime': all_ensembles_data.index,
+                                'flow_rate_m3s': all_ensembles_data['flow_rate'].clip(lower=0),
+                                'ensemble': all_ensembles_data.get('ensemble', ''),
+                                'is_selected': all_ensembles_data['ensemble'] == selected_ensemble if pd.notna(selected_ensemble) else True
+                            })
+                            
+                            # Use Altair for more control over the plot
+                            import altair as alt
+                            
+                            # Create base chart for background (all ensembles in light gray)
+                            background = alt.Chart(all_ensembles_df).mark_line(
+                                color='lightgray',
+                                opacity=0.3,
+                                strokeWidth=1
+                            ).encode(
+                                x=alt.X('datetime:T', title='Date/Time'),
+                                y=alt.Y('flow_rate_m3s:Q', title='Flow Rate (m³/s)', scale=alt.Scale(zero=True)),
+                                detail='ensemble:N'
+                            )
+                            
+                            # Create the main chart for the selected ensemble
+                            main_chart = alt.Chart(plot_df.reset_index()).mark_line(
+                                color='steelblue',
+                                strokeWidth=2
+                            ).encode(
+                                x=alt.X('datetime:T', title='Date/Time'),
+                                y=alt.Y('flow_rate_m3s:Q', title='Flow Rate (m³/s)'),
+                                tooltip=[
+                                    alt.Tooltip('datetime:T', title='Date/Time', format='%Y-%m-%d %H:%M'),
+                                    alt.Tooltip('flow_rate_m3s:Q', title='Flow Rate', format='.2f'),
+                                    'ensemble:N',
+                                    'climate_scenario:N',
+                                    'event_id:N'
+                                ]
+                            )
+                            
+                            # Combine the charts
+                            chart = (background + main_chart).properties(
+                                width='container',
+                                height=400
+                            )
+                            
+                            # Add points for better interactivity on the main line only
+                            points = main_chart.mark_point(size=50, opacity=0.1).encode(
+                                opacity=alt.value(0.01)
+                            )
+                            
+                            st.altair_chart(chart + points, use_container_width=True)
+                            
+                            # Add some stats
+                            max_flow = plot_df['flow_rate_m3s'].max()
+                            avg_flow = plot_df['flow_rate_m3s'].mean()
+                            st.caption(f"Max flow: {max_flow:.1f} m³/s | Avg flow: {avg_flow:.1f} m³/s | Ensemble: {selected_ensemble if pd.notna(selected_ensemble) else 'All'}")
+                        else:
+                            st.warning(f"No timeseries data available for the selected location.")
+                    else:
+                        st.warning("Please select a valid location.")
+                        
+                except Exception as e:
+                    st.error(f"Error loading location names: {str(e)}")
+                    # Fallback to basic functionality
+                    all_locs = sorted(model_data['location'].dropna().unique())
+                    selected_loc = st.selectbox("Select Location to Plot:", all_locs, key="design_loc_selector_fallback")
+                    
+                    if selected_loc and model_data.index.name == 'datetime':
                         plot_df = model_data[model_data['location'] == selected_loc]
                         if not plot_df.empty:
-                            # Create the chart, Streamlit will use the index for the x-axis
-                            st.line_chart(plot_df[['flow_rate']], use_container_width=True)
+                            st.line_chart(plot_df[['flow_rate']].clip(lower=0), use_container_width=True)
                         else:
-                            st.warning(f"No timeseries data available for '{selected_loc}'.")
-                    else:
-                        # This case indicates a problem with how the data was packaged or loaded.
-                        st.error("Critical Error: Data is not indexed by 'datetime' as expected.")
+                            st.warning(f"No timeseries data available for location {selected_loc}.")
 
             with tab2:
                 st.subheader("Peak Flows at All Locations")
@@ -283,30 +430,12 @@ def show_home_page(data):
 
 def add_geospatial_to_map(m, file_path, layer_name=None):
     """Add a KMZ, KML, or Shapefile to a folium map."""
-    try:
-        import geopandas as gpd
-        import fiona
-        
-        # Use fiona.Env for better GDAL environment control
-        with fiona.Env():
-            if file_path.lower().endswith(('.kmz', '.kml')):
-                # For KMZ/KML files, use the KML driver directly
-                gdf = gpd.read_file(file_path, driver='KML')
-            else:
-                # For Shapefile or other formats
-                gdf = gpd.read_file(file_path)
-                
-            # Ensure WGS84 (EPSG:4326) for folium
-            if gdf.crs and gdf.crs.to_epsg() != 4326:
-                gdf = gdf.to_crs(epsg=4326)
-                
-            # Add to map
-            folium.GeoJson(
-                gdf,
-                name=layer_name or os.path.basename(file_path),
-                tooltip=folium.GeoJsonTooltip(fields=gdf.columns.tolist())
-            ).add_to(m)
-            return True
+    try:                       
+        # Add to map
+        folium.GeoJson(file_path,               
+            name=layer_name or os.path.basename(file_path),            
+        ).add_to(m)
+        return True
             
     except Exception as e:
         st.error(f"Error loading {file_path}: {str(e)}")
@@ -316,11 +445,22 @@ def show_map_page():
     st.header("Map")
     m = folium.Map(location=[-27.4705, 153.0260], zoom_start=10)
 
-    # --- Default Brisbane Models KMZ overlay ---
-    kmz_path = os.path.join("geo", "Brisbane.kmz")
-    if os.path.exists(kmz_path):
-        if not add_geospatial_to_map(m, kmz_path, "Brisbane Models"):
-            st.warning("Could not load default KMZ. Ensure you have 'geopandas' and 'fiona' installed.")
+    # --- Load all GeoJSON files from the geo folder ---
+    geo_dir = "geo"
+    if os.path.exists(geo_dir) and os.path.isdir(geo_dir):
+        # Find all .geojson files in the geo directory
+        geojson_files = [f for f in os.listdir(geo_dir) if f.lower().endswith('.geojson')]
+        
+        if not geojson_files:
+            st.info("No GeoJSON files found in the 'geo' folder.")
+        else:
+            for geojson_file in geojson_files:
+                file_path = os.path.join(geo_dir, geojson_file)
+                layer_name = os.path.splitext(geojson_file)[0]  # Use filename without extension as layer name
+                if not add_geospatial_to_map(m, file_path, layer_name):
+                    st.warning(f"Could not load {geojson_file}")
+    else:
+        st.warning(f"The '{geo_dir}' directory does not exist.")
 
     # --- Uploaded file ---
     if st.session_state.uploaded_spatial_file is not None:
