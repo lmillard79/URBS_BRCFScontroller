@@ -1,0 +1,557 @@
+
+Developed by Don Carroll eMail: don.carroll@urbs.com.au
+Software contains bugs, All risk in usage 
+Software contains bugs and not fit for any purpose
+Reading initialisation file lower17.ini
+
+Reading Catchment File C:\BRCFS-MonteCarlo\temp\URBS_run\8_low_urbs\model\lower17.vec ...
+URBS Model: SPLIT
+Parameters: alpha =0.3000, m =  0.80, beta =  4.00, n =  1.00
+Accessing file lower17.dat
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\AREA_A.SQ
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\AREA_B.SQ
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\L_MANCHESTER.ELS
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\L_MANCHESTER.SQ
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\AREA_C.SQ
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\AREA_D.SQ
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\AREA_E.SQ
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\AREA_F.SQ
+Area= 13508.1, dav= 31.44, fav= 25.74, sf= 0.29, Cv= 0.423 g= 0.140 Sc=  0.00%
+Urban fraction = 0.033, Forest fraction = 0.000 Impervious fraction = 0.025
+Linked 104 pluviographs
+File ok!
+Reading Rainfall File C:\BRCFS-MonteCarlo\temp\URBS_run\8_low_urbs\model\lower17.rdf ...
+Accessing file ..\input\6.r 
+Accessing file ..\input\7.r 
+Accessing file ..\input\8.r 
+Accessing file ..\input\9.r 
+Accessing file ..\input\10.r 
+Accessing file ..\input\11.r 
+Accessing file ..\input\12.r 
+Accessing file ..\input\13.r 
+Accessing file ..\input\14.r 
+Accessing file ..\input\15.r 
+Accessing file ..\input\16.r 
+Accessing file ..\input\17.r 
+Accessing file ..\input\18.r 
+Accessing file ..\input\19.r 
+Accessing file ..\input\20.r 
+Accessing file ..\input\21.r 
+Accessing file ..\input\22.r 
+Accessing file ..\input\23.r 
+Accessing file ..\input\24.r 
+Accessing file ..\input\25.r 
+Accessing file ..\input\26.r 
+Accessing file ..\input\27.r 
+Accessing file ..\input\28.r 
+Accessing file ..\input\29.r 
+Accessing file ..\input\30.r 
+Accessing file ..\input\31.r 
+Accessing file ..\input\32.r 
+Accessing file ..\input\33.r 
+Accessing file ..\input\34.r 
+Accessing file ..\input\35.r 
+Accessing file ..\input\36.r 
+Accessing file ..\input\37.r 
+Accessing file ..\input\38.r 
+Accessing file ..\input\39.r 
+Accessing file ..\input\40.r 
+Accessing file ..\input\41.r 
+Accessing file ..\input\42.r 
+Accessing file ..\input\43.r 
+Accessing file ..\input\44.r 
+Accessing file ..\input\45.r 
+Accessing file ..\input\46.r 
+Accessing file ..\input\47.r 
+Accessing file ..\input\48.r 
+Accessing file ..\input\49.r 
+Accessing file ..\input\50.r 
+Accessing file ..\input\51.r 
+Accessing file ..\input\52.r 
+Accessing file ..\input\53.r 
+Accessing file ..\input\54.r 
+Accessing file ..\input\55.r 
+Accessing file ..\input\56.r 
+Accessing file ..\input\57.r 
+Accessing file ..\input\58.r 
+Accessing file ..\input\59.r 
+Accessing file ..\input\60.r 
+Accessing file ..\input\61.r 
+Accessing file ..\input\62.r 
+Accessing file ..\input\63.r 
+Accessing file ..\input\64.r 
+Accessing file ..\input\65.r 
+Accessing file ..\input\66.r 
+Accessing file ..\input\67.r 
+Accessing file ..\input\68.r 
+Accessing file ..\input\69.r 
+Accessing file ..\input\70.r 
+Accessing file ..\input\71.r 
+Accessing file ..\input\72.r 
+Accessing file ..\input\73.r 
+Accessing file ..\input\74.r 
+Accessing file ..\input\75.r 
+Accessing file ..\input\76.r 
+Accessing file ..\input\77.r 
+Accessing file ..\input\78.r 
+Accessing file ..\input\79.r 
+Accessing file ..\input\80.r 
+Accessing file ..\input\81.r 
+Accessing file ..\input\82.r 
+Accessing file ..\input\83.r 
+Accessing file ..\input\84.r 
+Accessing file ..\input\85.r 
+Accessing file ..\input\86.r 
+Accessing file ..\input\87.r 
+Accessing file ..\input\88.r 
+Accessing file ..\input\89.r 
+Accessing file ..\input\90.r 
+Accessing file ..\input\91.r 
+Accessing file ..\input\92.r 
+Accessing file ..\input\93.r 
+Accessing file ..\input\94.r 
+Accessing file ..\input\95.r 
+Accessing file ..\input\96.r 
+Accessing file ..\input\97.r 
+Accessing file ..\input\98.r 
+Accessing file ..\input\99.r 
+Accessing file ..\input\100.r 
+Accessing file ..\input\101.r 
+Accessing file ..\input\102.r 
+Accessing file ..\input\103.r 
+Accessing file ..\input\104.r 
+Accessing file ..\input\105.r 
+Accessing file ..\input\106.r 
+Accessing file ..\input\107.r 
+Accessing file ..\input\108.r 
+Accessing file ..\input\109.r 
+Accessing file ..\input\upper.i 
+Accessing file ..\input\oreillys_weir.o 
+Accessing file ..\input\walloon.o 
+Accessing file ..\input\amberley.o 
+Accessing file ..\input\loamside.o 
+File ok!
+Doing Hydrologic Model..Finished
+Writing Results..
+Finished Tue Apr 02 11:51:26  
+
+
+Use by   only: URBS Run dated Tue Apr 02 14:40:36  
+ 
+Developed by Don Carroll eMail: don.carroll@urbs.com.au
+Software contains bugs, All risk in usage lies with  
+Use by   only -  bears and accepts all risk with use
+Software contains bugs and not fit for any purpose
+Reading initialisation file lower17.ini
+
+Reading Catchment File C:\BRCFS-MonteCarlo\temp\URBS_run\8_low_urbs\model\lower17.vec ...
+URBS Model: SPLIT
+Parameters: alpha =0.3000, m =  0.80, beta =  4.00, n =  1.00
+Accessing file lower17.dat
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\AREA_A.SQ
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\AREA_B.SQ
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\L_MANCHESTER.ELS
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\L_MANCHESTER.SQ
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\AREA_C.SQ
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\AREA_D.SQ
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\AREA_E.SQ
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\AREA_F.SQ
+Area= 13508.1, dav= 31.44, fav= 25.74, sf= 0.29, Cv= 0.423 g= 0.140 Sc=  0.00%
+Urban fraction = 0.033, Forest fraction = 0.000 Impervious fraction = 0.025
+Linked 104 pluviographs
+File ok!
+Reading Rainfall File C:\BRCFS-MonteCarlo\temp\URBS_run\8_low_urbs\model\lower17.rdf ...
+Accessing file ..\input\6.r 
+Accessing file ..\input\7.r 
+Accessing file ..\input\8.r 
+Accessing file ..\input\9.r 
+Accessing file ..\input\10.r 
+Accessing file ..\input\11.r 
+Accessing file ..\input\12.r 
+Accessing file ..\input\13.r 
+Accessing file ..\input\14.r 
+Accessing file ..\input\15.r 
+Accessing file ..\input\16.r 
+Accessing file ..\input\17.r 
+Accessing file ..\input\18.r 
+Accessing file ..\input\19.r 
+Accessing file ..\input\20.r 
+Accessing file ..\input\21.r 
+Accessing file ..\input\22.r 
+Accessing file ..\input\23.r 
+Accessing file ..\input\24.r 
+Accessing file ..\input\25.r 
+Accessing file ..\input\26.r 
+Accessing file ..\input\27.r 
+Accessing file ..\input\28.r 
+Accessing file ..\input\29.r 
+Accessing file ..\input\30.r 
+Accessing file ..\input\31.r 
+Accessing file ..\input\32.r 
+Accessing file ..\input\33.r 
+Accessing file ..\input\34.r 
+Accessing file ..\input\35.r 
+Accessing file ..\input\36.r 
+Accessing file ..\input\37.r 
+Accessing file ..\input\38.r 
+Accessing file ..\input\39.r 
+Accessing file ..\input\40.r 
+Accessing file ..\input\41.r 
+Accessing file ..\input\42.r 
+Accessing file ..\input\43.r 
+Accessing file ..\input\44.r 
+Accessing file ..\input\45.r 
+Accessing file ..\input\46.r 
+Accessing file ..\input\47.r 
+Accessing file ..\input\48.r 
+Accessing file ..\input\49.r 
+Accessing file ..\input\50.r 
+Accessing file ..\input\51.r 
+Accessing file ..\input\52.r 
+Accessing file ..\input\53.r 
+Accessing file ..\input\54.r 
+Accessing file ..\input\55.r 
+Accessing file ..\input\56.r 
+Accessing file ..\input\57.r 
+Accessing file ..\input\58.r 
+Accessing file ..\input\59.r 
+Accessing file ..\input\60.r 
+Accessing file ..\input\61.r 
+Accessing file ..\input\62.r 
+Accessing file ..\input\63.r 
+Accessing file ..\input\64.r 
+Accessing file ..\input\65.r 
+Accessing file ..\input\66.r 
+Accessing file ..\input\67.r 
+Accessing file ..\input\68.r 
+Accessing file ..\input\69.r 
+Accessing file ..\input\70.r 
+Accessing file ..\input\71.r 
+Accessing file ..\input\72.r 
+Accessing file ..\input\73.r 
+Accessing file ..\input\74.r 
+Accessing file ..\input\75.r 
+Accessing file ..\input\76.r 
+Accessing file ..\input\77.r 
+Accessing file ..\input\78.r 
+Accessing file ..\input\79.r 
+Accessing file ..\input\80.r 
+Accessing file ..\input\81.r 
+Accessing file ..\input\82.r 
+Accessing file ..\input\83.r 
+Accessing file ..\input\84.r 
+Accessing file ..\input\85.r 
+Accessing file ..\input\86.r 
+Accessing file ..\input\87.r 
+Accessing file ..\input\88.r 
+Accessing file ..\input\89.r 
+Accessing file ..\input\90.r 
+Accessing file ..\input\91.r 
+Accessing file ..\input\92.r 
+Accessing file ..\input\93.r 
+Accessing file ..\input\94.r 
+Accessing file ..\input\95.r 
+Accessing file ..\input\96.r 
+Accessing file ..\input\97.r 
+Accessing file ..\input\98.r 
+Accessing file ..\input\99.r 
+Accessing file ..\input\100.r 
+Accessing file ..\input\101.r 
+Accessing file ..\input\102.r 
+Accessing file ..\input\103.r 
+Accessing file ..\input\104.r 
+Accessing file ..\input\105.r 
+Accessing file ..\input\106.r 
+Accessing file ..\input\107.r 
+Accessing file ..\input\108.r 
+Accessing file ..\input\109.r 
+Accessing file ..\input\upper.i 
+Accessing file ..\input\oreillys_weir.o 
+Accessing file ..\input\walloon.o 
+Accessing file ..\input\amberley.o 
+Accessing file ..\input\loamside.o 
+File ok!
+Doing Hydrologic Model..Finished
+Writing Results..
+Finished Tue Apr 02 14:40:37  
+
+
+Use by   only: URBS Run dated Tue Apr 02 14:46:30  
+ 
+Developed by Don Carroll eMail: don.carroll@urbs.com.au
+Software contains bugs, All risk in usage lies with  
+Use by   only -  bears and accepts all risk with use
+Software contains bugs and not fit for any purpose
+Reading initialisation file lower17.ini
+
+Reading Catchment File C:\BRCFS-MonteCarlo\temp\URBS_run\8_low_urbs\model\lower17.vec ...
+URBS Model: SPLIT
+Parameters: alpha =0.3000, m =  0.80, beta =  4.00, n =  1.00
+Accessing file lower17.dat
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\AREA_A.SQ
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\AREA_B.SQ
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\L_MANCHESTER.ELS
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\L_MANCHESTER.SQ
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\AREA_C.SQ
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\AREA_D.SQ
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\AREA_E.SQ
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\AREA_F.SQ
+Area= 13508.1, dav= 31.44, fav= 25.74, sf= 0.29, Cv= 0.423 g= 0.140 Sc=  0.00%
+Urban fraction = 0.033, Forest fraction = 0.000 Impervious fraction = 0.025
+Linked 104 pluviographs
+File ok!
+Reading Rainfall File C:\BRCFS-MonteCarlo\temp\URBS_run\8_low_urbs\model\lower17.rdf ...
+Accessing file ..\input\6.r 
+Accessing file ..\input\7.r 
+Accessing file ..\input\8.r 
+Accessing file ..\input\9.r 
+Accessing file ..\input\10.r 
+Accessing file ..\input\11.r 
+Accessing file ..\input\12.r 
+Accessing file ..\input\13.r 
+Accessing file ..\input\14.r 
+Accessing file ..\input\15.r 
+Accessing file ..\input\16.r 
+Accessing file ..\input\17.r 
+Accessing file ..\input\18.r 
+Accessing file ..\input\19.r 
+Accessing file ..\input\20.r 
+Accessing file ..\input\21.r 
+Accessing file ..\input\22.r 
+Accessing file ..\input\23.r 
+Accessing file ..\input\24.r 
+Accessing file ..\input\25.r 
+Accessing file ..\input\26.r 
+Accessing file ..\input\27.r 
+Accessing file ..\input\28.r 
+Accessing file ..\input\29.r 
+Accessing file ..\input\30.r 
+Accessing file ..\input\31.r 
+Accessing file ..\input\32.r 
+Accessing file ..\input\33.r 
+Accessing file ..\input\34.r 
+Accessing file ..\input\35.r 
+Accessing file ..\input\36.r 
+Accessing file ..\input\37.r 
+Accessing file ..\input\38.r 
+Accessing file ..\input\39.r 
+Accessing file ..\input\40.r 
+Accessing file ..\input\41.r 
+Accessing file ..\input\42.r 
+Accessing file ..\input\43.r 
+Accessing file ..\input\44.r 
+Accessing file ..\input\45.r 
+Accessing file ..\input\46.r 
+Accessing file ..\input\47.r 
+Accessing file ..\input\48.r 
+Accessing file ..\input\49.r 
+Accessing file ..\input\50.r 
+Accessing file ..\input\51.r 
+Accessing file ..\input\52.r 
+Accessing file ..\input\53.r 
+Accessing file ..\input\54.r 
+Accessing file ..\input\55.r 
+Accessing file ..\input\56.r 
+Accessing file ..\input\57.r 
+Accessing file ..\input\58.r 
+Accessing file ..\input\59.r 
+Accessing file ..\input\60.r 
+Accessing file ..\input\61.r 
+Accessing file ..\input\62.r 
+Accessing file ..\input\63.r 
+Accessing file ..\input\64.r 
+Accessing file ..\input\65.r 
+Accessing file ..\input\66.r 
+Accessing file ..\input\67.r 
+Accessing file ..\input\68.r 
+Accessing file ..\input\69.r 
+Accessing file ..\input\70.r 
+Accessing file ..\input\71.r 
+Accessing file ..\input\72.r 
+Accessing file ..\input\73.r 
+Accessing file ..\input\74.r 
+Accessing file ..\input\75.r 
+Accessing file ..\input\76.r 
+Accessing file ..\input\77.r 
+Accessing file ..\input\78.r 
+Accessing file ..\input\79.r 
+Accessing file ..\input\80.r 
+Accessing file ..\input\81.r 
+Accessing file ..\input\82.r 
+Accessing file ..\input\83.r 
+Accessing file ..\input\84.r 
+Accessing file ..\input\85.r 
+Accessing file ..\input\86.r 
+Accessing file ..\input\87.r 
+Accessing file ..\input\88.r 
+Accessing file ..\input\89.r 
+Accessing file ..\input\90.r 
+Accessing file ..\input\91.r 
+Accessing file ..\input\92.r 
+Accessing file ..\input\93.r 
+Accessing file ..\input\94.r 
+Accessing file ..\input\95.r 
+Accessing file ..\input\96.r 
+Accessing file ..\input\97.r 
+Accessing file ..\input\98.r 
+Accessing file ..\input\99.r 
+Accessing file ..\input\100.r 
+Accessing file ..\input\101.r 
+Accessing file ..\input\102.r 
+Accessing file ..\input\103.r 
+Accessing file ..\input\104.r 
+Accessing file ..\input\105.r 
+Accessing file ..\input\106.r 
+Accessing file ..\input\107.r 
+Accessing file ..\input\108.r 
+Accessing file ..\input\109.r 
+Accessing file ..\input\upper.i 
+Accessing file ..\input\oreillys_weir.o 
+Accessing file ..\input\walloon.o 
+Accessing file ..\input\amberley.o 
+Accessing file ..\input\loamside.o 
+File ok!
+Doing Hydrologic Model..Finished
+Writing Results..
+Finished Tue Apr 02 14:46:31  
+
+
+Use by   only: URBS Run dated Tue Apr 02 17:37:02  
+ 
+Developed by Don Carroll eMail: don.carroll@urbs.com.au
+Software contains bugs, All risk in usage lies with  
+Use by   only -  bears and accepts all risk with use
+Software contains bugs and not fit for any purpose
+Reading initialisation file lower17.ini
+
+Reading Catchment File C:\BRCFS-MonteCarlo\temp\URBS_run\8_low_urbs\model\lower17.vec ...
+URBS Model: SPLIT
+Parameters: alpha =0.3000, m =  0.80, beta =  4.00, n =  1.00
+Accessing file lower17.dat
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\AREA_A.SQ
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\AREA_B.SQ
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\L_MANCHESTER.ELS
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\L_MANCHESTER.SQ
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\AREA_C.SQ
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\AREA_D.SQ
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\AREA_E.SQ
+Accessing file C:\BRCFS-MonteCarlo\_hydra\Fews\Modules\urbs\ratings\AREA_F.SQ
+Area= 13508.1, dav= 31.44, fav= 25.74, sf= 0.29, Cv= 0.423 g= 0.140 Sc=  0.00%
+Urban fraction = 0.033, Forest fraction = 0.000 Impervious fraction = 0.025
+Linked 104 pluviographs
+File ok!
+Reading Rainfall File C:\BRCFS-MonteCarlo\temp\URBS_run\8_low_urbs\model\lower17.rdf ...
+Accessing file ..\input\6.r 
+Accessing file ..\input\7.r 
+Accessing file ..\input\8.r 
+Accessing file ..\input\9.r 
+Accessing file ..\input\10.r 
+Accessing file ..\input\11.r 
+Accessing file ..\input\12.r 
+Accessing file ..\input\13.r 
+Accessing file ..\input\14.r 
+Accessing file ..\input\15.r 
+Accessing file ..\input\16.r 
+Accessing file ..\input\17.r 
+Accessing file ..\input\18.r 
+Accessing file ..\input\19.r 
+Accessing file ..\input\20.r 
+Accessing file ..\input\21.r 
+Accessing file ..\input\22.r 
+Accessing file ..\input\23.r 
+Accessing file ..\input\24.r 
+Accessing file ..\input\25.r 
+Accessing file ..\input\26.r 
+Accessing file ..\input\27.r 
+Accessing file ..\input\28.r 
+Accessing file ..\input\29.r 
+Accessing file ..\input\30.r 
+Accessing file ..\input\31.r 
+Accessing file ..\input\32.r 
+Accessing file ..\input\33.r 
+Accessing file ..\input\34.r 
+Accessing file ..\input\35.r 
+Accessing file ..\input\36.r 
+Accessing file ..\input\37.r 
+Accessing file ..\input\38.r 
+Accessing file ..\input\39.r 
+Accessing file ..\input\40.r 
+Accessing file ..\input\41.r 
+Accessing file ..\input\42.r 
+Accessing file ..\input\43.r 
+Accessing file ..\input\44.r 
+Accessing file ..\input\45.r 
+Accessing file ..\input\46.r 
+Accessing file ..\input\47.r 
+Accessing file ..\input\48.r 
+Accessing file ..\input\49.r 
+Accessing file ..\input\50.r 
+Accessing file ..\input\51.r 
+Accessing file ..\input\52.r 
+Accessing file ..\input\53.r 
+Accessing file ..\input\54.r 
+Accessing file ..\input\55.r 
+Accessing file ..\input\56.r 
+Accessing file ..\input\57.r 
+Accessing file ..\input\58.r 
+Accessing file ..\input\59.r 
+Accessing file ..\input\60.r 
+Accessing file ..\input\61.r 
+Accessing file ..\input\62.r 
+Accessing file ..\input\63.r 
+Accessing file ..\input\64.r 
+Accessing file ..\input\65.r 
+Accessing file ..\input\66.r 
+Accessing file ..\input\67.r 
+Accessing file ..\input\68.r 
+Accessing file ..\input\69.r 
+Accessing file ..\input\70.r 
+Accessing file ..\input\71.r 
+Accessing file ..\input\72.r 
+Accessing file ..\input\73.r 
+Accessing file ..\input\74.r 
+Accessing file ..\input\75.r 
+Accessing file ..\input\76.r 
+Accessing file ..\input\77.r 
+Accessing file ..\input\78.r 
+Accessing file ..\input\79.r 
+Accessing file ..\input\80.r 
+Accessing file ..\input\81.r 
+Accessing file ..\input\82.r 
+Accessing file ..\input\83.r 
+Accessing file ..\input\84.r 
+Accessing file ..\input\85.r 
+Accessing file ..\input\86.r 
+Accessing file ..\input\87.r 
+Accessing file ..\input\88.r 
+Accessing file ..\input\89.r 
+Accessing file ..\input\90.r 
+Accessing file ..\input\91.r 
+Accessing file ..\input\92.r 
+Accessing file ..\input\93.r 
+Accessing file ..\input\94.r 
+Accessing file ..\input\95.r 
+Accessing file ..\input\96.r 
+Accessing file ..\input\97.r 
+Accessing file ..\input\98.r 
+Accessing file ..\input\99.r 
+Accessing file ..\input\100.r 
+Accessing file ..\input\101.r 
+Accessing file ..\input\102.r 
+Accessing file ..\input\103.r 
+Accessing file ..\input\104.r 
+Accessing file ..\input\105.r 
+Accessing file ..\input\106.r 
+Accessing file ..\input\107.r 
+Accessing file ..\input\108.r 
+Accessing file ..\input\109.r 
+Accessing file ..\input\upper.i 
+Accessing file ..\input\oreillys_weir.o 
+Accessing file ..\input\walloon.o 
+Accessing file ..\input\amberley.o 
+Accessing file ..\input\loamside.o 
+File ok!
+Doing Hydrologic Model..Finished
+Writing Results..
+Finished Tue Apr 02 17:37:04  
+

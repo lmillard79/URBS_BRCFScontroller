@@ -39,7 +39,7 @@ def show_historic_event_ui(data, col1, col2):
 
     with col1:
         st.subheader("Historic Event")
-        selected_event = st.selectbox("Select a Historic Calibration Event:", historic_events, key="historic_event_selector")
+        selected_event = st.selectbox("Select a Historic Calibration Event: (YYYYMMDD)", sorted(historic_events, reverse=True), key="historic_event_selector")
         show_no_dams = st.checkbox("Compare with 'No Dams' Scenario", value=True)
 
         # --- State Management & Buttons ---
@@ -129,7 +129,7 @@ def show_historic_event_ui(data, col1, col2):
             st.info("👈 Select a historic event and click 'Run URBS' to display results.")
 
 def show_design_event_ui(data, col1, col2):
-    """Displays the UI for selecting and visualizing design flood events."""
+    """Displays the UI for selecting and  visualising design flood events."""
     df = data.get('design_events')
     if df is None or df.empty:
         st.warning("No design event data found in the packaged file.")
@@ -235,7 +235,7 @@ def show_design_event_ui(data, col1, col2):
 
 
 def show_home_page(data):
-    st.markdown("## An interface to control and visualize URBS model inputs and outputs.")
+    st.markdown("## An interface to run BRCFS URBS model and visualise model inputs and outputs.")
     
     col1, col2 = st.columns([1, 2])
     
@@ -250,8 +250,8 @@ def show_home_page(data):
         
         **Features:**
         - **Historic Event Analysis**: Compare recorded flow data against 'With Dams' and 'No Dams' scenarios.
-        - **Design Event Analysis**: Filter and visualize results from various design storms based on AEP, duration, and climate change scenarios.
-        - **Interactive Visualizations**: Plot time series data and view peak flow summaries.
+        - **Design Event Analysis**: Filter and  visualise results from various design storms based on AEP, duration, and climate change scenarios.
+        - **Interactive  visualisations**: Plot time series data and view peak flow summaries.
         - **Model Control**: Simulate model runs and export results for further analysis in tools like TUFLOW.
         """)
 
@@ -292,9 +292,23 @@ def show_upload_page():
         st.success(f"File '{uploaded_file.name}' uploaded successfully! Go to the 'Map' page to see it.")
 
 def show_model_performance_page():
+    import os
+    st.header("Model Performance")
+    log_file_path = "data/urbsout.log"
+
     st.subheader("Latest Model Run Details (Dummy Data)")
-    st.markdown(f"""- **Last Model Run:** {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n- **Run Duration:** 0.1 seconds\n- **Status:** Success\n- **Errors:** None""")
-    st.info("More detailed historical performance logs will be available here in the future.")
+    st.markdown(f"""- **Last Model Run:** {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n- **Run Duration:** 23.1 seconds\n- **Status:** Success\n- **Errors:** None""")
+
+    with st.expander("View Raw URBS Output Log (`urbsout.log`)"):
+        if os.path.exists(log_file_path):
+            try:
+                with open(log_file_path, 'r') as f:
+                    log_content = f.read()
+                st.code(log_content, language='log')
+            except Exception as e:
+                st.error(f"An error occurred while reading the log file: {e}")
+        else:
+            st.warning(f"Log file not found at: {log_file_path}")
 
 def show_download_page():
     st.info("Options to download model results and exported data will be available here.")
@@ -333,7 +347,17 @@ def main():
     if 'uploaded_spatial_file' not in st.session_state:
         st.session_state.uploaded_spatial_file = None
 
-    st.set_page_config(page_title="URBS BRCFS Interface", page_icon="data/WRM_DROPLET.png", layout="wide")
+    st.set_page_config(page_title="URBS Flood Interface", page_icon="data/WRM_DROPLET.png", layout="wide")
+
+    # Custom CSS to make sidebar text white and bold
+    st.markdown("""
+    <style>
+        [data-testid="stSidebar"] h1, [data-testid="stSidebar"] label {
+            color: white !important;
+            font-weight: bold !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
 
     data = load_data()
     if data is None:

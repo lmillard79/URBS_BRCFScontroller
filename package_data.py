@@ -123,12 +123,18 @@ def process_design_events(root_path: str, sample_size: int = None) -> pd.DataFra
             ts_df.columns = [col.strip().replace('"', '').replace('(C)', '').strip() for col in ts_df.columns]
             
             variable_name = csv_file.parts[-3]
-            match = re.search(r'(\d+h)_(\d+)_(\d+Y)_(.+)', variable_name)
+            # Updated regex to capture AEP as a number and handle potential parsing errors
+            match = re.search(r'(\d+h)_(\d+)_(\d+)Y_(.+)', variable_name)
             if not match:
                 print(f"    Warning: Could not parse metadata from folder '{variable_name}'. Skipping.")
                 continue
             
-            duration, ensembleId, aepY, climate_scenario = match.groups()
+            duration, ensembleId, aep_str, climate_scenario = match.groups()
+            try:
+                aep = int(aep_str)
+            except ValueError:
+                print(f"    Warning: Could not convert AEP '{aep_str}' to integer. Skipping.")
+                continue
 
             params_line = lines[-1].strip()
             param_pattern = re.compile(
@@ -151,7 +157,7 @@ def process_design_events(root_path: str, sample_size: int = None) -> pd.DataFra
             melted_df['model_name'] = csv_file.name
             melted_df['duration'] = duration
             melted_df['ensemble'] = ensembleId
-            melted_df['aep'] = aepY
+            melted_df['aep'] = aep
             melted_df['climate_scenario_code'] = climate_scenario
 
             # Create a unique ID for the event type for easier selection in the UI
