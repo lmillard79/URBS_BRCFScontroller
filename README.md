@@ -3,6 +3,7 @@
 A Streamlit-based dashboard for controlling inputs and outputs of the URBS BRCFS project.
 
 ## Setup
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
  python -m venv .venv
 .venv\Scripts\activate
 python -m pip install --upgrade pip     
@@ -24,3 +25,9 @@ streamlit run urbs_flood_interface.py
 - Output visualization
 - Real-time parameter updates
 - Data export functionality
+
+
+
+### Troubleshooting
+python -m pip install --upgrade pip setuptools wheel
+pip install pandas

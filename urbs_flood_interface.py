@@ -6,7 +6,10 @@ import gzip
 import pickle
 import datetime
 import base64
+import os
 import folium
+
+import altair as alt
 from streamlit_folium import st_folium
 #import geopandas as gpd
 import io
@@ -227,9 +230,32 @@ def show_design_event_ui(data, col1, col2):
 
             with tab2:
                 st.subheader("Peak Flows at All Locations")
-                peak_flows = model_data.groupby('location')['flow_rate'].max().reset_index()
-                peak_flows.rename(columns={'flow_rate': 'Peak Flow (m³/s)'}, inplace=True)
-                st.dataframe(peak_flows.sort_values(by='Peak Flow (m³/s)', ascending=False).round(2), use_container_width=True, hide_index=True)
+                # Table of max peak per location
+                peak_table = model_data.groupby('location')['flow_rate'].max().reset_index()
+                peak_table.rename(columns={'flow_rate': 'Peak Flow (m³/s)'}, inplace=True)
+                st.dataframe(peak_table.sort_values(by='Peak Flow (m³/s)', ascending=False).round(2), use_container_width=True, hide_index=True)
+
+                st.markdown("### Distribution of Ensemble Peaks (Box Plot)")
+                # Compute peak per ensemble per location
+                box_df = (
+                    model_data.groupby(['location', 'ensemble'])['flow_rate']
+                              .max()
+                              .reset_index()
+                )
+                if not box_df.empty:
+                    import altair as alt
+                    chart = (
+                        alt.Chart(box_df)
+                            .mark_boxplot(extent='min-max')
+                            .encode(
+                                x=alt.X('location:N', title='Location'),
+                                y=alt.Y('flow_rate:Q', title='Peak Flow (m³/s)'),
+                                tooltip=['location', 'flow_rate']
+                            )
+                    )
+                    st.altair_chart(chart, use_container_width=True)
+                else:
+                    st.info("No ensemble peak data available for boxplot.")
         else:
             st.info("👈 Select event criteria and click 'Run URBS' to display results.")
 
@@ -255,25 +281,62 @@ def show_home_page(data):
         - **Model Control**: Simulate model runs and export results for further analysis in tools like TUFLOW.
         """)
 
+def add_geospatial_to_map(m, file_path, layer_name=None):
+    """Add a KMZ, KML, or Shapefile to a folium map."""
+    try:
+        import geopandas as gpd
+        import fiona
+        
+        # Use fiona.Env for better GDAL environment control
+        with fiona.Env():
+            if file_path.lower().endswith(('.kmz', '.kml')):
+                # For KMZ/KML files, use the KML driver directly
+                gdf = gpd.read_file(file_path, driver='KML')
+            else:
+                # For Shapefile or other formats
+                gdf = gpd.read_file(file_path)
+                
+            # Ensure WGS84 (EPSG:4326) for folium
+            if gdf.crs and gdf.crs.to_epsg() != 4326:
+                gdf = gdf.to_crs(epsg=4326)
+                
+            # Add to map
+            folium.GeoJson(
+                gdf,
+                name=layer_name or os.path.basename(file_path),
+                tooltip=folium.GeoJsonTooltip(fields=gdf.columns.tolist())
+            ).add_to(m)
+            return True
+            
+    except Exception as e:
+        st.error(f"Error loading {file_path}: {str(e)}")
+        return False
+
 def show_map_page():
     st.header("Map")
     m = folium.Map(location=[-27.4705, 153.0260], zoom_start=10)
 
+    # --- Default Brisbane Models KMZ overlay ---
+    kmz_path = os.path.join("geo", "Brisbane.kmz")
+    if os.path.exists(kmz_path):
+        if not add_geospatial_to_map(m, kmz_path, "Brisbane Models"):
+            st.warning("Could not load default KMZ. Ensure you have 'geopandas' and 'fiona' installed.")
+
+    # --- Uploaded file ---
     if st.session_state.uploaded_spatial_file is not None:
-        try:
-            file_bytes = io.BytesIO(st.session_state.uploaded_spatial_file.getvalue())
-            gdf = gpd.read_file(file_bytes)
-
-            if gdf.crs.to_epsg() != 4326:
-                gdf = gdf.to_crs(epsg=4326)
-
-            folium.GeoJson(
-                gdf,
-                name='Uploaded Layer'
-            ).add_to(m)
-
-        except Exception as e:
-            st.error(f"Could not read or display the uploaded file: {e}")
+        file_ext = os.path.splitext(st.session_state.uploaded_spatial_file.name)[1].lower()
+        if file_ext in ('.kmz', '.kml', '.shp', '.geojson'):
+            with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp:
+                tmp.write(st.session_state.uploaded_spatial_file.getvalue())
+                tmp_path = tmp.name
+            
+            success = add_geospatial_to_map(m, tmp_path, "Uploaded Layer")
+            os.unlink(tmp_path)  # Clean up temp file
+            
+            if not success:
+                st.error("Failed to process uploaded file. Ensure it's a valid spatial file.")
+        else:
+            st.error("Unsupported file format. Please upload a KMZ, KML, or Shapefile.")
 
     folium.LayerControl().add_to(m)
     st_folium(m, width=1500, height=700)

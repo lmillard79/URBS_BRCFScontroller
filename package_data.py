@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import numpy as np
 import pickle
 import gzip
 from typing import List, Dict, Any
@@ -192,6 +193,84 @@ def process_design_events(root_path: str, sample_size: int = None) -> pd.DataFra
     print("Design event processing complete.")
     return final_df
 
+# --- NEW: Monte-Carlo (.npz / .pkl) importer -
+from rsc.load_results import ResultCollection
+
+def process_mc_events(mc_dir: str, max_ensemble: int = 10) -> pd.DataFrame:
+    """
+    Convert BRFS Monte-Carlo result files into the same long format that the
+    design-event CSV parser produces so the Streamlit app can consume them.
+
+    Only the first *max_ensemble* events (0-based) for each duration/location
+    are kept, giving you the requested “groups of ten”.
+    """
+    rc = ResultCollection(mc_dir)
+    all_rows = []
+
+    # --- AEP & Duration lookup tables for cleaner naming ---
+    AEP_LIST = ['2','5','10','20','50','100','200','500','2000','10000','100000']
+    DUR_LIST = ['012h','018h','024h','036h','048h','072h','096h','120h','168h']  # extend as needed
+
+    for scen in rc.scenarios:
+        rf = rc[scen]
+        ts = rf.timeseries      # keys: 'qts', 'hts', …
+        climate_code = "E" if scen.endswith("B15") else scen[-3:]
+        scenario_map = {
+            "E": "SSP2 2030",  # B15
+            "CC1": "SSP3 2070",
+            "CC2": "SSP3 2070",
+            "CC3": "SSP5 2090",
+            "CC4": "SSP5 2090",
+        }
+        meta = {
+            "model_name": scen,
+            "climate_scenario_code": climate_code,
+            "climate_scenario": scenario_map.get(climate_code, climate_code),
+            # Dummy hydraulic-model parameters – not available for MC runs
+            "alpha": np.nan,
+            "m": np.nan,
+            "beta": np.nan,
+            "il": np.nan,
+            "cl": np.nan,
+        }
+
+        # qts/hts have shape [duration, event, location, time]
+        for var in ("qts", "hts"):
+            dur_list = ts[var]  # list[ndarray] · one array per duration
+            for d, cube in enumerate(dur_list):
+                # cube shape: (event, location, time)
+                n_evt, n_loc, _ = cube.shape
+                for e in range(min(n_evt, max_ensemble)):
+                    # Map index to labels
+                    aep_label = AEP_LIST[d] if d < len(AEP_LIST) else str(d)
+                    dur_label = DUR_LIST[d] if d < len(DUR_LIST) else f"{d}h"
+                    for loc in range(n_loc):
+                        series = cube[e, loc, :]
+                        # Build a DataFrame with one row per timestep
+                        df = pd.DataFrame({
+                            "datetime": pd.date_range(
+                                start="2000-01-01",
+                                periods=series.size,
+                                freq="h"   # 1-hour grid; adjust if necessary
+                            ),
+                            "location": loc,
+                            "flow_rate" if var == "qts" else "water_level": series,
+                        })
+                        # Optional: drop the generic 'value' column if created
+                        if "value" in df.columns:
+                            df.drop(columns="value", inplace=True)
+                        df["duration"] = d
+                        df["duration_label"] = dur_label
+                        df["ensemble"] = e
+                        df["aep"] = aep_label
+                        df["event_id"] = f"{aep_label} {dur_label}"
+                        all_rows.append(df.assign(**meta))
+
+    if not all_rows:
+        return pd.DataFrame()
+
+    return pd.concat(all_rows).set_index("datetime")
+
 def package_data():
     """Reads all data from Excel and CSV files and packages it into a compressed pickle file."""
     print("Starting data packaging process...")
@@ -224,6 +303,15 @@ def package_data():
     if not design_events_df.empty:
         packaged_data['design_events'] = design_events_df
         print(f"Successfully processed and added {len(design_events_df.index.unique())} rows of design event data.")
+
+    # --- 2b.  Process Monte-Carlo (npz/pkl) Results ---------------------- ###
+    mc_events_df = process_mc_events("rsc")         # path to your .npz files
+    if not mc_events_df.empty:
+        packaged_data['design_events'] = (
+            pd.concat([packaged_data['design_events'], mc_events_df])
+              .sort_index()
+        )
+        print(f"Added {len(mc_events_df.index.unique())} Monte-Carlo rows.")
 
     # --- 3. Save Packaged Data ---
     print(f"\nSaving all packaged data to {PACKAGED_DATA_PATH}...")
