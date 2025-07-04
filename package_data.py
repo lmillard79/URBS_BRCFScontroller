@@ -32,15 +32,28 @@ def get_parameters(file_path: str, sheet_name: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 def get_timeseries(file_path: str, sheet_name: str) -> pd.DataFrame:
-    """Reads timeseries data for a given event sheet."""
+    """Reads timeseries data for a given event sheet, coercing data types."""
     try:
         locations_df = pd.read_excel(file_path, sheet_name=sheet_name, engine='openpyxl', header=None, skiprows=24, nrows=1, usecols='B:AJ')
         locations = locations_df.iloc[0].dropna().tolist()
         ts_df = pd.read_excel(file_path, sheet_name=sheet_name, engine='openpyxl', skiprows=25, usecols='A:AJ')
         ts_df.columns = ['datetime'] + locations
-        ts_df['datetime'] = pd.to_datetime(ts_df['datetime'], unit='D', origin='1899-12-30')
-        return ts_df.set_index('datetime').dropna(how='all')
-    except Exception:
+
+        # Coerce datetime column, turning errors into NaT (Not a Time)
+        ts_df['datetime'] = pd.to_datetime(ts_df['datetime'], errors='coerce', unit='D', origin='1899-12-30')
+
+        # Coerce all data columns to numeric, turning non-numeric values into NaN
+        for col in locations:
+            if col in ts_df.columns:
+                ts_df[col] = pd.to_numeric(ts_df[col], errors='coerce')
+        
+        # Drop rows where the datetime is invalid or all data points are missing
+        ts_df.dropna(subset=['datetime'], inplace=True)
+        ts_df.dropna(subset=locations, how='all', inplace=True)
+        
+        return ts_df.set_index('datetime')
+    except Exception as e:
+        print(f"Warning: Could not process timeseries for sheet '{sheet_name}' in {os.path.basename(file_path)}. Error: {e}")
         return pd.DataFrame()
 
 # --- Main Packaging Logic ---

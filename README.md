@@ -14,7 +14,7 @@ pip install -r requirements.txt
 
 2. Run the application:
 ```bash
-streamlit run urbs_interface.py 
+streamlit run urbs_flood_interface.py 
 
 # streamlit run app.py
 ```
