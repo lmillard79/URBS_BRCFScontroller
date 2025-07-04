@@ -316,7 +316,7 @@ def show_design_event_ui(data, col1, col2):
                             # Create base chart for background (all ensembles in light gray)
                             background = alt.Chart(all_ensembles_df).mark_line(
                                 color='lightgray',
-                                opacity=0.3,
+                                opacity=0.8,
                                 strokeWidth=1
                             ).encode(
                                 x=alt.X('datetime:T', title='Date/Time'),
