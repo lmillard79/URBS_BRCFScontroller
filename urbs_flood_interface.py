@@ -4,34 +4,255 @@ import numpy as np
 import time
 import gzip
 import pickle
+import re
 import datetime
 import base64
 import os
+from pathlib import Path
 import folium
-
 import altair as alt
 from streamlit_folium import st_folium
-#import geopandas as gpd
-import io
-
-from package_data import PACKAGED_DATA_PATH
+from typing import Dict, Any, Optional, List, Tuple
 
 # --- Configuration ---
-# PACKAGED_DATA_PATH = "data/packaged_data.pkl.gz"
+PACKAGED_DATA_DIR = Path("packaged_data")
 
 # --- Data Loading ---
-@st.cache_data
-def load_data():
-    """Load the packaged data file, returning None if not found."""
+@st.cache_data(show_spinner="Loading packaged data...")
+def load_packaged_data() -> Dict[str, Any]:
+    """
+    Load all available packaged data files from the packaged_data directory.
+    
+    Returns:
+        Dict containing loaded data with keys:
+        - 'historical': Historical data if available
+        - 'design': Design event data if available
+        - 'models': Dict of additional model data
+    """
+    data = {
+        'historical': None,
+        'design_MC': None,
+        'design_B15': None,
+    }
+    
     try:
-        with gzip.open(PACKAGED_DATA_PATH, 'rb') as f:
-            return pickle.load(f)
-    except FileNotFoundError:
-        st.error(f"The data file ({PACKAGED_DATA_PATH}) was not found. Please run `package_data.py` first.")
-        return None
+        # Create packaged_data directory if it doesn't exist
+        PACKAGED_DATA_DIR.mkdir(exist_ok=True)
+        
+        # Load historical data if exists
+        hist_path = PACKAGED_DATA_DIR / "HISTORICAL_packaged_data.pkl.gz"
+        if hist_path.exists():
+            with gzip.open(hist_path, 'rb') as f:
+                loaded = pickle.load(f)
+                print(f"Loaded historical data type: {type(loaded)}")
+                data['historical'] = loaded
+
+        # Load design data if exists
+        design_path = PACKAGED_DATA_DIR / "DESIGN_URBS_packaged_j_drive_data.pkl.gz"
+        if design_path.exists():
+            with gzip.open(design_path, 'rb') as f:
+                loaded = pickle.load(f)
+                print(f"Loaded design_MC data type: {type(loaded)}")
+                data['design_MC'] = loaded
+                
+                # Debug: Print structure of design_MC
+                if hasattr(loaded, 'keys'):
+                    print(f"design_MC keys: {loaded.keys()}")
+                if hasattr(loaded, 'shape'):  # If it's a DataFrame
+                    print(f"design_MC columns: {loaded.columns.tolist() if hasattr(loaded, 'columns') else 'N/A'}")
+
+        # Load B15 design data if exists
+        design_b15_path = PACKAGED_DATA_DIR / "DESIGN_B15_flow_timeseries_2030_SSP2.pkl"
+        if design_b15_path.exists():
+            try:
+                with open(design_b15_path, 'rb') as f:
+                    loaded_df = pickle.load(f)
+                
+                print(f"Loaded design_B15 data type: {type(loaded_df)}")
+
+                if isinstance(loaded_df, pd.DataFrame):
+                    location_cols = [col for col in loaded_df.columns if str(col).startswith('RL_')]
+                    if location_cols:
+                        st.info("B15 data is in wide format. Restructuring...")
+                        try:
+                            id_vars = [col for col in loaded_df.columns if not str(col).startswith('RL_')]
+                            long_df = pd.melt(loaded_df, id_vars=id_vars, value_vars=location_cols, var_name='location', value_name='flow_rate')
+                            long_df['location'] = long_df['location'].str.split(' ').str[0]
+
+                            # Replace -99999 with NaN
+                            long_df['flow_rate'] = long_df['flow_rate'].replace(-99999, np.nan)
+                            st.success("Replaced -99999 with NaN values.")
+
+                            # Filter out Ensemble_ID == 1
+                            if 'Ensemble_ID' in long_df.columns:
+                                original_rows = len(long_df)
+                                long_df = long_df[long_df['Ensemble_ID'] != 1].copy()
+                                rows_removed = original_rows - len(long_df)
+                                st.success(f"Filtered out Ensemble_ID 1, removing {rows_removed} rows.")
+                            else:
+                                st.warning("'Ensemble_ID' column not found for filtering.")
+
+                            if 'TimeStep' in long_df.columns:
+                                long_df['time_hours'] = (long_df['TimeStep'] - 1) * 0.25
+                                st.success("Calculated 'time_hours' from 'TimeStep' with 0.25hr step.")
+                            else:
+                                st.warning("Could not find 'TimeStep' column to calculate time axis.")
+
+
+                            data['design_B15'] = {'design_events': long_df}
+                        except Exception as e:
+                            st.error(f"Failed to restructure B15 data: {e}")
+                            data['design_B15'] = {'design_events': loaded_df}
+                    else:
+                        st.info("B15 data appears to be in long format.")
+                        data['design_B15'] = {'design_events': loaded_df}
+
+                elif isinstance(loaded_df, dict):
+                    data['design_B15'] = loaded_df
+                else:
+                    st.warning(f"Loaded B15 data is of an unexpected type: {type(loaded_df)}")
+
+            except Exception as e:
+                st.error(f"Error loading or processing design_B15 data: {str(e)}")
+                import traceback
+                traceback.print_exc()
+
     except Exception as e:
-        st.error(f"An error occurred while loading the data file: {e}")
-        return None
+        st.error(f"Error loading packaged data: {str(e)}")    
+              
+    return data
+
+def get_available_models(data: Dict[str, Any]) -> List[Tuple[str, str]]:
+    """Get list of available models from the loaded data, ensuring they have valid data."""
+    models = []
+    
+    # Check for URBS Monte Carlo Design Runs
+    design_mc_data = data.get('design_MC', {})
+    if isinstance(design_mc_data, dict):
+        df_mc = design_mc_data.get('design_events')
+        if isinstance(df_mc, pd.DataFrame) and not df_mc.empty:
+            models.append(('URBS Monte Carlo Design Runs', 'design_MC'))
+            
+    # Check for B15 design events
+    design_b15_data = data.get('design_B15')
+    if design_b15_data:
+        df_b15 = None
+        if isinstance(design_b15_data, dict):
+            df_b15 = design_b15_data.get('design_events')
+        elif isinstance(design_b15_data, pd.DataFrame):
+            df_b15 = design_b15_data
+            # Ensure data is stored in the consistent dict structure
+            data['design_B15'] = {'design_events': df_b15}
+        
+        if isinstance(df_b15, pd.DataFrame) and not df_b15.empty:
+            # Avoid adding duplicates
+            if not any(m[1] == 'design_B15' for m in models):
+                 models.append(('URBS B15 Design Events', 'design_B15'))
+            
+    return models
+
+def get_available_aeps(data: Dict[str, Any], model_type: str) -> List[float]:
+    """Get available AEPs for the selected model type."""
+    if model_type == 'design_MC':
+        df = data.get('design_MC', {}).get('design_events')
+        aep_col = 'aep'
+    elif model_type == 'design_B15':
+        df = data.get('design_B15', {}).get('design_events')
+        aep_col = 'AEP_Value'
+    else:
+        return []
+
+    if df is None or aep_col not in df.columns:
+        return []
+
+    try:
+        raw_aeps = df[aep_col].dropna().unique()
+        aeps = set()
+        for val in raw_aeps:
+            if isinstance(val, str):
+                # Extract numbers from strings like '1 in 100'
+                numbers = re.findall(r'\d+\.?\d*', val)
+                if numbers:
+                    aeps.add(float(numbers[-1]))
+            elif isinstance(val, (int, float, np.number)):
+                aeps.add(float(val))
+        
+        return sorted(list(aeps))
+    except Exception as e:
+        st.error(f"An error occurred while processing AEP values: {e}")
+        return []
+
+def load_location_mappings(filepath: str = 'rsc/LocNames.txt') -> Dict[str, str]:
+    """Loads location mappings from a file."""
+    mappings = {}
+    try:
+        with open(filepath, 'r') as f:
+            for line in f:
+                line = line.strip().strip('"')
+                parts = line.split(' ', 1)
+                if len(parts) == 2:
+                    key = parts[0]
+                    value = parts[1]
+                    mappings[value] = key # Map display name to original ID
+    except FileNotFoundError:
+        st.error(f"Location mapping file not found at: {filepath}")
+    return mappings
+
+def get_available_locations(data: Dict[str, Any], model_type: str, selected_aep: Optional[float] = None) -> List[Tuple[str, str]]:
+    """Get available location names for a given model."""
+    location_mappings = load_location_mappings()
+    reverse_mappings = {v: k for k, v in location_mappings.items()}
+    locations = set()
+    
+    df = None
+    if model_type == 'design_MC':
+        df = data.get('design_MC', {}).get('design_events')
+    elif model_type == 'design_B15':
+        df = data.get('design_B15', {}).get('design_events')
+    
+    if df is not None and 'location' in df.columns:
+        locations.update(df['location'].dropna().unique())
+        
+    # Map to display names
+    display_locations = []
+    for loc_id in sorted(list(locations)):
+        display_name = reverse_mappings.get(loc_id, loc_id.replace('_', ' ').title())
+        display_locations.append((display_name, loc_id))
+        
+    return [("Select a location", "")] + display_locations
+
+def get_available_climate_scenarios(data):
+    """Extracts available climate scenarios from the MC design data."""
+    df = data.get('design_MC', {}).get('design_events')
+    if df is not None and 'climate_scenario_code' in df.columns:
+        # Add a default option
+        scenarios = ["Select a scenario"] + sorted(df['climate_scenario_code'].unique().tolist())
+        return scenarios
+    return []
+
+def get_available_ensembles(data, aep, location):
+    """Extracts available ensemble IDs from the B15 design data for a given AEP and location."""
+    if not all([aep, location, aep != "Select an AEP"]):
+        return []
+        
+    df = data.get('design_B15', {}).get('design_events')
+    if df is None or 'Ensemble_ID' not in df.columns or 'AEP_Years' not in df.columns or 'location' not in df.columns:
+        return []
+        
+    try:
+        aep_int = int(aep)
+    except (ValueError, TypeError):
+        return []
+
+    filtered_df = df[(df['AEP_Years'] == aep_int) & (df['location'] == location)]
+    
+    if not filtered_df.empty:
+        return sorted([int(e) for e in filtered_df['Ensemble_ID'].unique()])
+    return []
+
+def map_location_name(location: str, model_type: str) -> str:
+    """Map location names between different model types if needed."""
+    return location
 
 # --- Page Implementations ---
 def show_historic_event_ui(data, col1, col2):
@@ -131,280 +352,324 @@ def show_historic_event_ui(data, col1, col2):
         else:
             st.info("👈 Select a historic event and click 'Run URBS' to display results.")
 
-def show_design_event_ui(data, col1, col2):
-    """Displays the UI for selecting and  visualising design flood events."""
-    df = data.get('design_events')
-    if df is None or df.empty:
-        st.warning("No design event data found in the packaged file.")
-        return
+def show_design_event_ui():
+    """Displays the UI for selecting and visualizing design flood events."""
+    col1, col2 = st.columns([1, 2])
+
+    if 'packaged_data' not in st.session_state:
+        with st.spinner("Loading data..."):
+            st.session_state.packaged_data = load_packaged_data()
+    data = st.session_state.packaged_data
 
     with col1:
-        st.subheader("Filter Design Events")
+        st.subheader("Design Event Selection")
+
+        available_models = get_available_models(data)
+        if not available_models:
+            st.warning("No model data available. Please upload data first.")
+            return
+
+        model_display_names = [m[0] for m in available_models]
         
-        event_ids = sorted(df['event_id'].dropna().unique())
-        scenarios = sorted(df['climate_scenario'].dropna().unique())
+        try:
+            default_model_index = model_display_names.index(st.session_state.get('selected_model_display'))
+        except (ValueError, TypeError):
+            default_model_index = 0
+
+        selected_model_display = st.selectbox(
+            "Select Model Type:",
+            options=model_display_names,
+            index=default_model_index,
+            key='model_selector'
+        )
+        st.session_state.selected_model_display = selected_model_display
+        model_key = next((key for name, key in available_models if name == selected_model_display), None)
+
+        available_aeps = get_available_aeps(data, model_key)
+        if not available_aeps:
+            st.warning(f"No AEP data available for {selected_model_display}.")
+            selected_aep = None
+        else:
+            try:
+                default_aep_index = available_aeps.index(st.session_state.get('selected_aep'))
+            except (ValueError, TypeError):
+                default_aep_index = 0
+            selected_aep = st.selectbox(
+                "Select Annual Exceedance Probability (AEP):",
+                options=available_aeps,
+                index=default_aep_index,
+                format_func=lambda x: f"1 in {int(x)} AEP" if x else "",
+                key='aep_selector'
+            )
+            st.session_state.selected_aep = selected_aep
+
+        available_locations = get_available_locations(data, model_key, selected_aep)
+        if not available_locations or len(available_locations) <= 1:
+            st.warning("No locations found for the selected criteria.")
+            display_name = None
+            original_location = None
+        else:
+            try:
+                default_loc_index = available_locations.index(st.session_state.get('selected_location_tuple', available_locations[0]))
+            except (ValueError, TypeError):
+                default_loc_index = 0
+
+            selected_location_tuple = st.selectbox(
+                "Select Location:",
+                options=available_locations,
+                index=default_loc_index,
+                key='selected_location_tuple',
+                format_func=lambda x: x[0]
+            )
+
+            if selected_location_tuple and len(selected_location_tuple) == 2 and selected_location_tuple[1]:
+                display_name = selected_location_tuple[0]
+                original_location = selected_location_tuple[1]
+            else:
+                display_name = None
+                original_location = None
+
+        if model_key == 'design_MC':
+            climate_scenarios = get_available_climate_scenarios(data)
+            if climate_scenarios:
+                st.selectbox(
+                    "Select Climate Scenario:",
+                    options=climate_scenarios,
+                    key='selected_climate_scenario'
+                )
         
-        selected_event_id = st.selectbox("Select Event (AEP - Duration - Ensemble):", event_ids, key="design_event_selector")
-        selected_scenario = st.selectbox("Select Climate Scenario:", scenarios, key="design_scenario_selector")
+        elif model_key == 'design_B15':
+            # Get current selections to filter the ensemble list dynamically
+            selected_aep = st.session_state.get('selected_aep')
+            selected_loc_tuple = st.session_state.get('selected_location_tuple')
+            original_location = selected_loc_tuple[1] if selected_loc_tuple and len(selected_loc_tuple) > 1 else None
 
-        # --- State Management & Buttons ---
-        run_key = f"{selected_event_id}_{selected_scenario}"
-        if 'show_design_results' not in st.session_state:
-            st.session_state.show_design_results = False
-        if 'design_run_complete' not in st.session_state:
-            st.session_state.design_run_complete = False
+            ensembles = get_available_ensembles(data, selected_aep, original_location)
+            
+            if ensembles:
+                st.selectbox(
+                    "Select Ensemble ID:",
+                    options=ensembles,
+                    key='selected_ensemble_id'
+                )
+            else:
+                st.info("Select an AEP and Location to see available ensembles.")
 
-        if 'design_run_key' in st.session_state and st.session_state.design_run_key != run_key:
-            st.session_state.show_design_results = False
-            st.session_state.design_run_complete = False
-
-        if st.button("▶️ Run URBS", use_container_width=True, key="run_design", type="primary"):
-            st.session_state.design_run_key = run_key
-            st.session_state.show_design_results = True
-            st.session_state.design_run_complete = False
-            st.rerun()
-
-        st.button("✅ Export to TUFLOW", use_container_width=True, key="export_design", disabled=not st.session_state.get('design_run_complete', False), type="primary")
-
-        if st.button("🔄 Reset Model", use_container_width=True, key="reset_design"):
-            st.session_state.show_design_results = False
-            st.session_state.design_run_complete = False
-            if 'design_run_key' in st.session_state:
-                del st.session_state['design_run_key']
-            st.rerun()
+        if st.button("Run Analysis", key='run_analysis_button'):
+            if model_key and selected_aep and original_location and selected_aep != "Select an AEP":
+                st.session_state.design_run_key = (model_key, selected_aep, display_name)
+                st.session_state.original_location_name = original_location
+                st.session_state.show_results = True
+                st.rerun()
+            else:
+                st.warning("Please ensure all selections are made before running the analysis.")
+                st.session_state.show_results = False
 
     with col2:
-        st.header("Event Data Analysis")
-        if st.session_state.get('show_design_results', False):
-            if not st.session_state.get('design_run_complete', False):
-                with st.spinner("Model running..."):
-                    time.sleep(4)
-                    st.session_state.design_run_complete = True
-                    st.rerun()
-
-            # Filter the DataFrame based on the "run" selection
-            run_event_id, run_scenario = st.session_state.design_run_key.rsplit('_', 1)
-            filtered_df = df[
-                (df['event_id'] == run_event_id) &
-                (df['climate_scenario'] == run_scenario)
-            ]
-
-            if filtered_df.empty:
-                st.warning("No models match the selected filter criteria.")
-                return
-
-            st.subheader("Available Model Runs & Parameters")
-            param_cols = ['model_name', 'alpha', 'm', 'beta', 'il', 'cl']
-            models_to_show = filtered_df[param_cols].drop_duplicates().set_index('model_name')
-            st.dataframe(models_to_show, use_container_width=True)
-            
-            selected_model = st.selectbox("Select Model Run to Plot:", models_to_show.index, key="design_model_selector")
-
-            if not selected_model:
-                st.info("Select a model run to see the analysis.")
-                return
-
-            st.success(f"Displaying data for Model: **{selected_model}**")
-            model_data = filtered_df[filtered_df['model_name'] == selected_model]
-
-            tab1, tab2 = st.tabs(["📈 Time Series", "📊 Peak Flows"])
-
-            with tab1:
-                st.subheader("Flow Time Series Analysis")
-                
-                # Get location indices and map to human-readable names
-                try:
-                    from rsc.location_index import lookup_name
-                    all_locs = sorted(model_data['location'].dropna().unique())
-                    # Convert location indices to names, falling back to index if name not found
-                    loc_names = {loc: lookup_name(int(loc)) if str(loc).isdigit() else loc for loc in all_locs}
-                    # Sort locations by their human-readable names
-                    sorted_locs = sorted(all_locs, key=lambda x: loc_names.get(x, str(x)))
-                    
-                    # Create mapping for display and selection
-                    display_names = [f"{loc_names.get(loc, 'Unknown')} (ID: {loc})" for loc in sorted_locs]
-                    loc_to_display = dict(zip(sorted_locs, display_names))
-                    
-                    selected_display = st.selectbox(
-                        "Select Location to Plot:",
-                        options=display_names,
-                        key="design_loc_selector"
-                    )
-                    
-                    # Extract the original location ID from the selected display name
-                    selected_loc = next((loc for loc, name in loc_to_display.items() if name == selected_display), None)
-                    
-                    if selected_loc:
-                        # Get the full data for the selected location
-                        plot_data = model_data[model_data['location'] == selected_loc].copy()
-                        
-                        if not plot_data.empty and model_data.index.name == 'datetime':
-                            # Get unique ensemble members
-                            available_ensembles = sorted(plot_data['ensemble'].unique())
-                            
-                            # Add ensemble selector with on_change to trigger rerun
-                            selected_ensemble = st.selectbox(
-                                "Select Ensemble Member:",
-                                options=available_ensembles,
-                                format_func=lambda x: f"Ensemble {x}" if pd.notna(x) else "All Ensembles",
-                                key=f"ensemble_selector_{selected_loc}",
-                                on_change=lambda: st.session_state.update({"force_rerun": True})
-                            )
-                            
-                            # Force a rerun if the ensemble selection changed
-                            if st.session_state.get("force_rerun", False):
-                                st.session_state["force_rerun"] = False
-                                st.rerun()
-                            
-                            # Filter data by selected ensemble if not 'All'
-                            if pd.notna(selected_ensemble):
-                                plot_data = plot_data[plot_data['ensemble'] == selected_ensemble]
-                            
-                            # Create a clean DataFrame with flow rate and other relevant columns
-                            plot_df = pd.DataFrame({
-                                'datetime': plot_data.index,
-                                'flow_rate_m3s': plot_data['flow_rate'].clip(lower=0),
-                                'climate_scenario': plot_data.get('climate_scenario', ''),
-                                'ensemble': plot_data.get('ensemble', ''),
-                                'event_id': plot_data.get('event_id', '')
-                            }).set_index('datetime')
-                            
-                            # Ensure unique datetime index and drop NA values
-                            if plot_df.index.duplicated().any():
-                                # If there are still duplicates (e.g., from multiple runs), take the first occurrence
-                                plot_df = plot_df[~plot_df.index.duplicated(keep='first')]
-                            
-                            # Drop any rows with NA values in the flow rate column
-                            plot_df = plot_df.dropna(subset=['flow_rate_m3s'])
-                            
-                            # Display the data table
-                            st.subheader("Flow Time Series Data")
-                            st.dataframe(plot_df, use_container_width=True)
-                            
-                            # Add download button for CSV
-                            csv = plot_df.reset_index().to_csv(index=False).encode('utf-8')
-                            st.download_button(
-                                label="Download CSV",
-                                data=csv,
-                                file_name=f"flow_data_location_{selected_loc}_ensemble_{selected_ensemble if pd.notna(selected_ensemble) else 'all'}.csv",
-                                mime="text/csv",
-                                key=f"download_{selected_loc}_{selected_ensemble}"
-                            )
-                            
-                            # Create the chart with y-axis starting at 0
-                            st.subheader("Flow Rate Visualization")
-                            
-                            # Get all ensemble data for background, excluding Ensemble 0
-                            all_ensembles_data = model_data[
-                                (model_data['location'] == selected_loc) & 
-                                (model_data['ensemble'] != 0)  # Exclude Ensemble 0
-                            ].copy()
-                            all_ensembles_data = all_ensembles_data[~all_ensembles_data.index.duplicated(keep='first')]
-                            all_ensembles_data = all_ensembles_data.dropna(subset=['flow_rate'])
-                            
-                            # Create a combined DataFrame with ensemble info
-                            all_ensembles_df = pd.DataFrame({
-                                'datetime': all_ensembles_data.index,
-                                'flow_rate_m3s': all_ensembles_data['flow_rate'].clip(lower=0),
-                                'ensemble': all_ensembles_data.get('ensemble', ''),
-                                'is_selected': all_ensembles_data['ensemble'] == selected_ensemble if pd.notna(selected_ensemble) else True
-                            })
-                            
-                            # Use Altair for more control over the plot
-                            import altair as alt
-                            
-                            # Create base chart for background (all ensembles in light gray)
-                            background = alt.Chart(all_ensembles_df).mark_line(
-                                color='lightgray',
-                                opacity=0.8,
-                                strokeWidth=1
-                            ).encode(
-                                x=alt.X('datetime:T', title='Date/Time'),
-                                y=alt.Y('flow_rate_m3s:Q', title='Flow Rate (m³/s)', scale=alt.Scale(zero=True)),
-                                detail='ensemble:N'
-                            )
-                            
-                            # Create the main chart for the selected ensemble
-                            main_chart = alt.Chart(plot_df.reset_index()).mark_line(
-                                color='steelblue',
-                                strokeWidth=2
-                            ).encode(
-                                x=alt.X('datetime:T', title='Date/Time'),
-                                y=alt.Y('flow_rate_m3s:Q', title='Flow Rate (m³/s)'),
-                                tooltip=[
-                                    alt.Tooltip('datetime:T', title='Date/Time', format='%Y-%m-%d %H:%M'),
-                                    alt.Tooltip('flow_rate_m3s:Q', title='Flow Rate', format='.2f'),
-                                    'ensemble:N',
-                                    'climate_scenario:N',
-                                    'event_id:N'
-                                ]
-                            )
-                            
-                            # Combine the charts
-                            chart = (background + main_chart).properties(
-                                width='container',
-                                height=400
-                            )
-                            
-                            # Add points for better interactivity on the main line only
-                            points = main_chart.mark_point(size=50, opacity=0.1).encode(
-                                opacity=alt.value(0.01)
-                            )
-                            
-                            st.altair_chart(chart + points, use_container_width=True)
-                            
-                            # Add some stats
-                            max_flow = plot_df['flow_rate_m3s'].max()
-                            avg_flow = plot_df['flow_rate_m3s'].mean()
-                            st.caption(f"Max flow: {max_flow:.1f} m³/s | Avg flow: {avg_flow:.1f} m³/s | Ensemble: {selected_ensemble if pd.notna(selected_ensemble) else 'All'}")
-                        else:
-                            st.warning(f"No timeseries data available for the selected location.")
-                    else:
-                        st.warning("Please select a valid location.")
-                        
-                except Exception as e:
-                    st.error(f"Error loading location names: {str(e)}")
-                    # Fallback to basic functionality
-                    all_locs = sorted(model_data['location'].dropna().unique())
-                    selected_loc = st.selectbox("Select Location to Plot:", all_locs, key="design_loc_selector_fallback")
-                    
-                    if selected_loc and model_data.index.name == 'datetime':
-                        plot_df = model_data[model_data['location'] == selected_loc]
-                        if not plot_df.empty:
-                            st.line_chart(plot_df[['flow_rate']].clip(lower=0), use_container_width=True)
-                        else:
-                            st.warning(f"No timeseries data available for location {selected_loc}.")
-
-            with tab2:
-                st.subheader("Peak Flows at All Locations")
-                # Table of max peak per location
-                peak_table = model_data.groupby('location')['flow_rate'].max().reset_index()
-                peak_table.rename(columns={'flow_rate': 'Peak Flow (m³/s)'}, inplace=True)
-                st.dataframe(peak_table.sort_values(by='Peak Flow (m³/s)', ascending=False).round(2), use_container_width=True, hide_index=True)
-
-                st.markdown("### Distribution of Ensemble Peaks (Box Plot)")
-                # Compute peak per ensemble per location
-                box_df = (
-                    model_data.groupby(['location', 'ensemble'])['flow_rate']
-                              .max()
-                              .reset_index()
-                )
-                if not box_df.empty:
-                    import altair as alt
-                    chart = (
-                        alt.Chart(box_df)
-                            .mark_boxplot(extent='min-max')
-                            .encode(
-                                x=alt.X('location:N', title='Location'),
-                                y=alt.Y('flow_rate:Q', title='Peak Flow (m³/s)'),
-                                tooltip=['location', 'flow_rate']
-                            )
-                    )
-                    st.altair_chart(chart, use_container_width=True)
-                else:
-                    st.info("No ensemble peak data available for boxplot.")
+        if st.session_state.get('show_results', False):
+            display_design_results()
         else:
-            st.info("👈 Select event criteria and click 'Run URBS' to display results.")
+            st.info("👈 Select a model, AEP, and location, then click 'Run Analysis' to display results.")
+            st.markdown("---")
+            with st.expander("About Model Types"):
+                st.markdown("""
+                - **URBS Monte Carlo Design Runs**: Contains probabilistic design events from the URBS model
+                - **Design Events**: Contains traditional design storm events
+                
+                Note: Location names may vary between model types. Each model type maintains its own location naming convention.
+                """)
+
+def display_design_results():
+    """Display the design event results based on user selection."""
+    if 'design_run_key' not in st.session_state or not st.session_state.design_run_key:
+        return
+
+    model_key, aep, location = st.session_state.design_run_key
+
+    if not all([model_key, aep, location]):
+        st.warning("Please complete your selection (Model, AEP, and Location).")
+        return
+
+    original_location = st.session_state.get('original_location_name', location)
+    model_name_map = {key: name for name, key in get_available_models(st.session_state.packaged_data)}
+    model_name = model_name_map.get(model_key, "Unknown Model")
+    data = st.session_state.packaged_data
+    
+    selected_scenario = st.session_state.get('selected_climate_scenario')
+    subheader_text = f"{model_name} - {location} (1 in {int(aep)} AEP)"
+    if model_key == 'design_MC' and selected_scenario and selected_scenario != "Select a scenario":
+        subheader_text += f" - Scenario: {selected_scenario}"
+    st.subheader(subheader_text)
+    
+    if model_key == 'design_MC':
+        df = data.get('design_MC', {}).get('design_events')
+        aep_col = 'aep'
+    elif model_key == 'design_B15':
+        df = data.get('design_B15', {}).get('design_events')
+        aep_col = 'AEP_Value'  # Corrected column name
+    else:
+        st.error("Invalid model type selected.")
+        return
+
+    if df is None:
+        st.error("No data available for the selected model.")
+        return
+
+
+
+    df_copy = df.copy()
+    numeric_aep_col = 'numeric_aep_for_filter'
+
+    def parse_aep_value(val):
+        if isinstance(val, str):
+            numbers = re.findall(r'\d+\.?\d*', val)
+            if numbers:
+                return float(numbers[-1])
+        elif isinstance(val, (int, float, np.number)):
+            return float(val)
+        return np.nan
+
+    if aep_col in df_copy.columns:
+        df_copy[numeric_aep_col] = df_copy[aep_col].apply(parse_aep_value)
+        filtered_data = df_copy[(df_copy[numeric_aep_col] == aep) & (df_copy['location'] == original_location)]
+
+        # Also filter by climate scenario if applicable for Monte Carlo
+        if model_key == 'design_MC':
+            selected_scenario = st.session_state.get('selected_climate_scenario')
+            if selected_scenario and selected_scenario != "Select a scenario":
+                if 'climate_scenario_code' in filtered_data.columns:
+                    filtered_data = filtered_data[filtered_data['climate_scenario_code'] == selected_scenario]
+                else:
+                    st.warning("'climate_scenario_code' column not found for scenario filtering.")
+    else:
+        st.error(f"AEP column '{aep_col}' not found in the data for {model_name}.")
+        return
+    
+    if filtered_data.empty:
+        warning_message = f"No data found for AEP={aep} and Location='{original_location}'"
+        if model_key == 'design_MC':
+            selected_scenario = st.session_state.get('selected_climate_scenario')
+            if selected_scenario and selected_scenario != "Select a scenario":
+                warning_message += f" and Scenario='{selected_scenario}'"
+        warning_message += "."
+        st.warning(warning_message)
+        return
+
+
+
+    st.session_state.filtered_data = filtered_data
+    
+    if filtered_data.empty:
+        st.warning("No data available for the selected criteria.")
+        return
+
+    tab1, tab2 = st.tabs(["📈 Time Series", "📄 Data Table"])
+
+    with tab1:
+        plot_data = filtered_data.copy()
+        time_col_found = False
+        
+        # Case 1: Time information is in the index
+        if plot_data.index.name in ['datetime', 'TimeStep', 'date', 'time', 'TimeStep_hrs'] and pd.api.types.is_datetime64_any_dtype(plot_data.index):
+            time_col_found = True
+            time_col = plot_data.index.name
+            plot_data.index = pd.to_datetime(plot_data.index, errors='coerce')
+            
+        # Case 2: Time information is in a column
+        else:
+            time_col = next((col for col in ['datetime', 'time_hours', 'TimeStep', 'date', 'time'] if col in plot_data.columns), None)
+            if time_col:
+                time_col_found = True
+                if time_col == 'time_hours':
+                    # The 'time_hours' column is already numeric and represents hours.
+                    # We can set it as index directly.
+                    plot_data = plot_data.set_index(time_col)
+                else:
+                    plot_data[time_col] = pd.to_datetime(plot_data[time_col], errors='coerce')
+                    plot_data = plot_data.set_index(time_col)
+
+        flow_col = next((col for col in ['flow_rate', 'flow', 'value'] if col in plot_data.columns), None)
+
+        if time_col_found and flow_col:
+            plot_data.dropna(subset=[flow_col], inplace=True)
+            plot_data[flow_col] = pd.to_numeric(plot_data[flow_col], errors='coerce')
+            plot_data.dropna(subset=[flow_col], inplace=True)
+
+            col1, col2 = st.columns([1, 2])
+
+            with col1:
+                st.markdown("#### Peak Flow Distribution")
+                if model_key == 'design_B15' and 'Ensemble_ID' in filtered_data.columns:
+                    peak_flows = filtered_data.groupby('Ensemble_ID')[flow_col].max().reset_index()
+                    
+                    if not peak_flows.empty:
+                        # Base chart for layering
+                        base = alt.Chart(peak_flows)
+
+                        # Box plot layer
+                        boxplot = base.mark_boxplot(
+                            extent='min-max',
+                            size=50
+                        ).encode(
+                            y=alt.Y(f'{flow_col}:Q', title='Peak Flow (m³/s)')
+                        )
+
+                        # Jittered scatter plot layer for individual data points
+                        points = base.mark_circle(
+                            color='black',
+                            size=20
+                        ).encode(
+                            x=alt.X('jitter:Q', title=None, axis=alt.Axis(grid=False, ticks=False, labels=False)),
+                            y=alt.Y(f'{flow_col}:Q')
+                        ).transform_calculate(
+                            # Generate a random number between -1 and 1 for jitter
+                            jitter='2 * random() - 1'
+                        ).properties(
+                            # Define the width of the jitter area
+                            width=30
+                        )
+
+                        # Layer the charts
+                        chart = (boxplot + points).properties(
+                            title='Distribution of Peak Flows'
+                        )
+                        st.altair_chart(chart, use_container_width=True)
+                    else:
+                        st.warning("No peak flow data to display in box plot.")
+                else:
+                    st.info("Box plot of peaks is available for B15 ensembles.")
+
+            with col2:
+                st.markdown("#### Flow Time Series")
+                
+                # Use a different variable for the line chart data to avoid modifying the original filtered data
+                line_chart_data = plot_data
+                if model_key == 'design_B15':
+                    selected_ensemble = st.session_state.get('selected_ensemble_id')
+                    if selected_ensemble:
+                        # Filter the data for the line chart to the selected ensemble
+                        line_chart_data = plot_data[plot_data['Ensemble_ID'] == selected_ensemble]
+                        st.info(f"Showing time series for Ensemble {selected_ensemble}")
+                    else:
+                        st.warning("Select an ensemble to view its time series.")
+                        line_chart_data = pd.DataFrame() # Clear the chart if no ensemble is selected
+
+                if not line_chart_data.empty:
+                    st.line_chart(line_chart_data[flow_col])
+                elif model_key == 'design_B15':
+                    st.info("Time series for the selected ensemble will be displayed here.")
+
+        elif not time_col_found:
+            st.warning("Could not find a suitable time column for plotting.")
+        elif not flow_col:
+            st.warning("Could not find a suitable flow/value column for plotting.")
+
+    with tab2:
+        # Exclude confusing columns from the data table view
+        cols_to_drop = ['TimeStep', 'TimeStep_hrs', 'AEP_Years']
+        display_df = filtered_data.drop(columns=[col for col in cols_to_drop if col in filtered_data.columns])
+        st.dataframe(display_df, use_container_width=True)
+
 
 
 def show_home_page(data):
@@ -463,7 +728,7 @@ def show_map_page():
         st.warning(f"The '{geo_dir}' directory does not exist.")
 
     # --- Uploaded file ---
-    if st.session_state.uploaded_spatial_file is not None:
+    if 'uploaded_spatial_file' in st.session_state and st.session_state.uploaded_spatial_file is not None:
         file_ext = os.path.splitext(st.session_state.uploaded_spatial_file.name)[1].lower()
         if file_ext in ('.kmz', '.kml', '.shp', '.geojson'):
             with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp:
@@ -485,9 +750,13 @@ def show_upload_page():
     st.header("Upload Spatial Data")
     st.write("Upload a zipped shapefile (.zip) or a KML file (.kml) to display on the map.")
 
+    # Initialize uploaded_spatial_file in session state if it doesn't exist
+    if 'uploaded_spatial_file' not in st.session_state:
+        st.session_state.uploaded_spatial_file = None
+
     uploaded_file = st.file_uploader(
         "Choose a file",
-        type=['zip', 'kml']
+        type=['zip', 'kml', 'kmz', 'shp', 'geojson']
     )
 
     if uploaded_file is not None:
@@ -517,6 +786,18 @@ def show_download_page():
     st.info("Options to download model results and exported data will be available here.")
 
 def show_settings_page():
+    st.header("URBS Model Settings")
+    st.write("Update URBS switches here.") 
+    genre = st.radio(
+    "Enable URBS switches",
+    ["URBS TFLW", "URBS ATKN", "URBS MATCH", "URBS BASEFLOW"],
+    captions=[
+        "Output TUFLOW csv.",
+        "Use RAFTS settings in URBS.",
+        "Match Gauge station flows.",
+        "Enable Baseflow model."]
+    
+)
     st.info("Application settings and user preferences will be configured here.")
 
 def show_feedback_page():
@@ -546,56 +827,73 @@ def add_logo_to_page():
 
 # --- Main Application Router ---
 def main():
+    # Clear any cached data
     st.cache_data.clear()
-    if 'uploaded_spatial_file' not in st.session_state:
-        st.session_state.uploaded_spatial_file = None
-
-    st.set_page_config(page_title="URBS Flood Interface", page_icon="data/WRM_DROPLET.png", layout="wide")
-
-    # Custom CSS to make sidebar text white and bold
-    st.markdown("""
-    <style>
-        [data-testid="stSidebar"] h1, [data-testid="stSidebar"] label {
-            color: white !important;
-            font-weight: bold !important;
-        }
-    </style>
-    """, unsafe_allow_html=True)
-
-    data = load_data()
-    if data is None:
-        st.error("Could not load data file.")
-        return
-
-    PAGES = {
-        "Home": show_home_page,
-        "Historic Event": show_historic_event_ui,
-        "Design Event": show_design_event_ui,
-
-        "Map": show_map_page,
-        "Upload": show_upload_page,
-        "Model Performance": show_model_performance_page,
-        "Download": show_download_page,
-        "Settings": show_settings_page,
-        "User Feedback": show_feedback_page,
-    }
-
-    with st.sidebar:
-        st.title("Navigation")
-        selection = st.radio("Go to", list(PAGES.keys()))
-
-    page_func = PAGES[selection]
-
-    # Call the selected page function with the correct arguments
-    if selection in ["Historic Event", "Design Event"]:
-        col1, col2 = st.columns([1, 2])
-        page_func(data, col1, col2)
-    elif selection == "Home":
-        page_func(data)
-    else:
-        page_func()
-
+    
+    # Set page config with WRM favicon
+    st.set_page_config(
+        page_title="WRM URBS Flood Model Interface",
+        page_icon="./data/WRM_DROPLET.png",  # Path to your WRM favicon file
+        layout="wide",  # Can be "centered" or "wide"
+        initial_sidebar_state="expanded"
+    )
+    
+    # Add custom CSS for favicon in case the above doesn't work
+    st.markdown(
+        '''
+        <link rel="icon" type="image/x-icon" href="./rsc/favicon.ico">
+        <link rel="shortcut icon" type="image/x-icon" href="./rsc/favicon.ico">
+        ''',
+        unsafe_allow_html=True
+    )
+    
+    # Initialize session state
+    if 'data' not in st.session_state:
+        st.session_state.data = {}
+    
+    # Add logo to page
     add_logo_to_page()
+    
+    # Sidebar navigation
+    st.sidebar.title("Navigation")
+    page = st.sidebar.radio(
+        "Go to",
+        ["Home", "Historic Events", "Design Events", "Map", "Upload Data", "Model Performance", "Settings", "Feedback"]
+    )
+    
+    # Page routing
+    if page == "Home":
+        show_home_page(st.session_state.data)
+    elif page == "Historic Events":
+        # Create columns for historic events
+        col1, col2 = st.columns([1, 2])
+        if 'historical' in st.session_state.get('packaged_data', {}):
+            show_historic_event_ui(st.session_state.packaged_data['historical'], col1, col2)
+        else:
+            st.warning("No historical data available. Please check your packaged data files.")
+    elif page == "Design Events":
+        show_design_event_ui()
+    elif page == "Map":
+        show_map_page()
+    elif page == "Upload Data":
+        show_upload_page()
+    elif page == "Model Performance":
+        show_model_performance_page()
+    elif page == "Settings":
+        show_settings_page()
+    elif page == "Feedback":
+        show_feedback_page()
 
 if __name__ == "__main__":
+    # Initialize session state for the design event UI
+    if 'show_results' not in st.session_state:
+        st.session_state.show_results = False
+    if 'selected_model' not in st.session_state:
+        st.session_state.selected_model = None
+    if 'selected_aep' not in st.session_state:
+        st.session_state.selected_aep = None
+    if 'selected_location' not in st.session_state:
+        st.session_state.selected_location = None
+    
+    # Run the main app
     main()
