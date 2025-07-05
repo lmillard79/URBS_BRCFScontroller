@@ -320,9 +320,35 @@ def package_data():
     
     print("\nPackaging complete! You can now run the Streamlit application.")
 
+def package_j_drive_data(j_drive_csv_root: str, output_filename: str = None):
+    """
+    Processes CSVs from the specified J: drive folder and saves them in a separate .pkl.gz file,
+    using the same format and naming conventions as the main package_data output.
+    """
+    print(f"\nProcessing design events from J drive: {j_drive_csv_root} ...")
+    packaged_data = {
+        'design_events': pd.DataFrame()
+    }
+    # Use the same logic as process_design_events, but with the J drive root path
+    design_events_df = process_design_events(j_drive_csv_root)
+    if not design_events_df.empty:
+        packaged_data['design_events'] = design_events_df
+        print(f"Successfully processed and added {len(design_events_df.index.unique())} rows of J drive design event data.")
+    else:
+        print("No design event data found in the specified J: drive folder.")
+    # Determine output file name
+    if output_filename is None:
+        output_filename = os.path.join(DATA_DIR, "packaged_j_drive_data.pkl.gz")
+    print(f"\nSaving J drive packaged data to {output_filename} ...")
+    with gzip.open(output_filename, 'wb') as f:
+        pickle.dump(packaged_data, f)
+    print("J drive data packaging complete.")
+
 if __name__ == "__main__":
     # --- For full data packaging, uncomment the line below and comment out the test block ---
-    package_data()
+    #package_data()
+    # To process J drive CSVs, uncomment and specify the correct folder:
+    package_j_drive_data(DESIGN_EVENT_ROOT_PATH)
 
     # # --- For testing the design event parser on a small sample ---
     # print("--- Running in Test Mode: Processing a sample of design events ---")
