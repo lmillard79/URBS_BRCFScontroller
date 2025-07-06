@@ -2,6 +2,6 @@
 base                     = "light"
 primaryColor             = "#8dc63f"   # WRM Green
 backgroundColor          = "#FFFFFF"
-secondaryBackgroundColor = "#00b49d"   # Bright Teal / 00928f WRM Teal
+secondaryBackgroundColor = "#00928f"   # Bright Teal / 00928f WRM Teal
 # textColor              = "#1e4164"   # WRM Blue – headings/body text
 font                     = "Calibri"
