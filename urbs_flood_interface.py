@@ -15,111 +15,160 @@ from streamlit_folium import st_folium
 from typing import Dict, Any, Optional, List, Tuple
 
 # --- Configuration ---
+# Directory containing legacy pickled "packaged_data" files (kept for backwards-compatibility)
 PACKAGED_DATA_DIR = Path("packaged_data")
+# Directory containing modern parquet versions of the same datasets
+PARQUET_DATA_DIR = Path("data_parquet")
 
 # --- Data Loading ---
-@st.cache_data(show_spinner="Loading packaged data...")
+@st.cache_data(show_spinner="Loading packaged data (parquet/pickle)...")
 def load_packaged_data() -> Dict[str, Any]:
+    """Load model datasets from either **data_parquet** (preferred) or legacy
+    **packaged_data** pickles so that the rest of the interface continues to
+    work unchanged.
+
+    The function builds a nested dict with the expected keys/structure:
+        data = {
+            'historical': {
+                'historic_events': List[str],
+                'with_dams': {event_id: {'params': DataFrame, 'timeseries': DataFrame}},
+                'no_dams' :  { ... same structure ... }
+            },
+            'design_MC':  {'design_events': DataFrame},
+            'design_B15': {'design_events': DataFrame}
+        }
+    Only the pieces that can be found are populated; missing parts are kept as
+    ``None`` so that calling code can degrade gracefully.
     """
-    Load all available packaged data files from the packaged_data directory.
-    
-    Returns:
-        Dict containing loaded data with keys:
-        - 'historical': Historical data if available
-        - 'design': Design event data if available
-        - 'models': Dict of additional model data
-    """
-    data = {
+    data: Dict[str, Any] = {
         'historical': None,
         'design_MC': None,
         'design_B15': None,
     }
-    
+
+    # ------------------------------------------------------------------
+    # 1️⃣  Prefer modern parquet files ----------------------------------
+    # ------------------------------------------------------------------
     try:
-        # Create packaged_data directory if it doesn't exist
-        PACKAGED_DATA_DIR.mkdir(exist_ok=True)
-        
-        # Load historical data if exists
-        hist_path = PACKAGED_DATA_DIR / "HISTORICAL_packaged_data.pkl.gz"
-        if hist_path.exists():
-            with gzip.open(hist_path, 'rb') as f:
-                loaded = pickle.load(f)
-                print(f"Loaded historical data type: {type(loaded)}")
-                data['historical'] = loaded
+        if PARQUET_DATA_DIR.exists():
+            # ---- Monte-Carlo design events ---------------------------------
+            mc_path = PARQUET_DATA_DIR / "design_mc.parquet"
+            if mc_path.exists():
+                df_mc = pd.read_parquet(mc_path)
+                # Ensure categorical/text columns keep small memory footprint
+                cat_cols = [c for c in df_mc.select_dtypes(include="object").columns if c not in ["datetime"]]
+                for c in cat_cols:
+                    df_mc[c] = df_mc[c].astype("category")
+                data['design_MC'] = {'design_events': df_mc}
 
-        # Load design data if exists
-        design_path = PACKAGED_DATA_DIR / "DESIGN_URBS_packaged_j_drive_data.pkl.gz"
-        if design_path.exists():
-            with gzip.open(design_path, 'rb') as f:
-                loaded = pickle.load(f)
-                print(f"Loaded design_MC data type: {type(loaded)}")
-                data['design_MC'] = loaded
-                
-                # Debug: Print structure of design_MC
-                if hasattr(loaded, 'keys'):
-                    print(f"design_MC keys: {loaded.keys()}")
-                if hasattr(loaded, 'shape'):  # If it's a DataFrame
-                    print(f"design_MC columns: {loaded.columns.tolist() if hasattr(loaded, 'columns') else 'N/A'}")
+            # ---- B15 design events ----------------------------------------
+            b15_path = PARQUET_DATA_DIR / "design_b15.parquet"
+            if b15_path.exists():
+                df_b15 = pd.read_parquet(b15_path)
+                # Replace sentinel -99999 with NaN across all numeric cols
+                num_cols = df_b15.select_dtypes(include=['number']).columns
+                df_b15[num_cols] = df_b15[num_cols].replace(-99999, np.nan)
+                # Harmonise column names with the rest of the app
+                rename_map = {
+                    'Location': 'location',
+                    'flow': 'flow_rate',
+                }
+                df_b15 = df_b15.rename(columns=rename_map)
+                if 'AEP_Value' in df_b15.columns:
+                     # Convert probability (e.g., 0.01) to return-period years (e.g., 100)
+                     df_b15['AEP_Years'] = (1.0 / df_b15['AEP_Value']).round(0).astype('Int64')
+                data['design_B15'] = {'design_events': df_b15}
 
-        # Load B15 design data if exists
-        design_b15_path = PACKAGED_DATA_DIR / "DESIGN_B15_flow_timeseries_2030_SSP2.pkl"
-        if design_b15_path.exists():
-            try:
-                with open(design_b15_path, 'rb') as f:
-                    loaded_df = pickle.load(f)
-                
-                print(f"Loaded design_B15 data type: {type(loaded_df)}")
+            # ---- Historical runs -----------------------------------------
+            hist_events_p = PARQUET_DATA_DIR / "HISTORICAL_packaged_data_historic_events.parquet"
+            if hist_events_p.exists():
+                hist_events_df = pd.read_parquet(hist_events_p)
+                # The parquet is just a single unnamed column – grab the values
+                historic_events_list = hist_events_df.iloc[:, 0].astype(str).tolist()
+            else:
+                historic_events_list = []
 
-                if isinstance(loaded_df, pd.DataFrame):
-                    location_cols = [col for col in loaded_df.columns if str(col).startswith('RL_')]
-                    if location_cols:
-                        st.info("B15 data is in wide format. Restructuring...")
-                        try:
-                            id_vars = [col for col in loaded_df.columns if not str(col).startswith('RL_')]
-                            long_df = pd.melt(loaded_df, id_vars=id_vars, value_vars=location_cols, var_name='location', value_name='flow_rate')
-                            long_df['location'] = long_df['location'].str.split(' ').str[0]
+            # Build nested dictionaries for each historic event using the new per-event parquet files
+            if historic_events_list:
+                with_dams_dict = {}
+                no_dams_dict = {}
+                for evt in historic_events_list:
+                    evt = str(evt).strip()
+                    # --- with dams ---
+                    p_params = PARQUET_DATA_DIR / f"historic_with_dams_{evt}_params.parquet"
+                    p_ts     = PARQUET_DATA_DIR / f"historic_with_dams_{evt}_timeseries.parquet"
+                    evt_dict: Dict[str, Any] = {}
+                    if p_params.exists():
+                        evt_dict['params'] = pd.read_parquet(p_params)
+                    if p_ts.exists():
+                        evt_dict['timeseries'] = pd.read_parquet(p_ts)
+                    if evt_dict:
+                        with_dams_dict[evt] = evt_dict
+                    # --- no dams ---
+                    p_params_nd = PARQUET_DATA_DIR / f"historic_no_dams_{evt}_params.parquet"
+                    p_ts_nd     = PARQUET_DATA_DIR / f"historic_no_dams_{evt}_timeseries.parquet"
+                    evt_nd_dict: Dict[str, Any] = {}
+                    if p_params_nd.exists():
+                        evt_nd_dict['params'] = pd.read_parquet(p_params_nd)
+                    if p_ts_nd.exists():
+                        evt_nd_dict['timeseries'] = pd.read_parquet(p_ts_nd)
+                    if evt_nd_dict:
+                        no_dams_dict[evt] = evt_nd_dict
+                data['historical'] = {
+                    'historic_events': historic_events_list,
+                    'with_dams': with_dams_dict,
+                    'no_dams': no_dams_dict,
+                }
+            else:
+                # Ensure 'historical' key exists to prevent NoneType errors downstream
+                data['historical'] = {
+                    'historic_events': [],
+                    'with_dams': {},
+                    'no_dams': {},
+                }
 
-                            # Replace -99999 with NaN
-                            long_df['flow_rate'] = long_df['flow_rate'].replace(-99999, np.nan)
-                            st.success("Replaced -99999 with NaN values.")
-
-                            # Filter out Ensemble_ID == 1
-                            if 'Ensemble_ID' in long_df.columns:
-                                original_rows = len(long_df)
-                                long_df = long_df[long_df['Ensemble_ID'] != 1].copy()
-                                rows_removed = original_rows - len(long_df)
-                                st.success(f"Filtered out Ensemble_ID 1, removing {rows_removed} rows.")
-                            else:
-                                st.warning("'Ensemble_ID' column not found for filtering.")
-
-                            if 'TimeStep' in long_df.columns:
-                                long_df['time_hours'] = (long_df['TimeStep'] - 1) * 0.25
-                                st.success("Calculated 'time_hours' from 'TimeStep' with 0.25hr step.")
-                            else:
-                                st.warning("Could not find 'TimeStep' column to calculate time axis.")
-
-
-                            data['design_B15'] = {'design_events': long_df}
-                        except Exception as e:
-                            st.error(f"Failed to restructure B15 data: {e}")
-                            data['design_B15'] = {'design_events': loaded_df}
-                    else:
-                        st.info("B15 data appears to be in long format.")
-                        data['design_B15'] = {'design_events': loaded_df}
-
-                elif isinstance(loaded_df, dict):
-                    data['design_B15'] = loaded_df
-                else:
-                    st.warning(f"Loaded B15 data is of an unexpected type: {type(loaded_df)}")
-
-            except Exception as e:
-                st.error(f"Error loading or processing design_B15 data: {str(e)}")
-                import traceback
-                traceback.print_exc()
 
     except Exception as e:
-        st.error(f"Error loading packaged data: {str(e)}")    
-              
+        st.warning(f"Parquet loading failed – falling back to pickles.\n{e}")
+
+    # ------------------------------------------------------------------
+    # 2️⃣  Fallback to legacy pickles ------------------------------------
+    # ------------------------------------------------------------------
+    # Only attempt the expensive pickle load if the above keys are still None
+    try:
+        if data['design_MC'] is None or data['design_B15'] is None or data['historical'] is None:
+            PACKAGED_DATA_DIR.mkdir(exist_ok=True)
+
+        # -- Monte-Carlo ---------------------------------------------------
+        if data['design_MC'] is None:
+            pkl_mc = PACKAGED_DATA_DIR / "DESIGN_URBS_packaged_j_drive_data.pkl.gz"
+            if pkl_mc.exists():
+                with gzip.open(pkl_mc, 'rb') as f:
+                    data['design_MC'] = pickle.load(f)
+                    if isinstance(data['design_MC'], pd.DataFrame):
+                        data['design_MC'] = {'design_events': data['design_MC']}
+
+        # -- B15 -----------------------------------------------------------
+        if data['design_B15'] is None:
+            pkl_b15 = PACKAGED_DATA_DIR / "DESIGN_B15_flow_timeseries_2030_SSP2.pkl"
+            if pkl_b15.exists():
+                with open(pkl_b15, 'rb') as f:
+                    loaded_b15 = pickle.load(f)
+                if isinstance(loaded_b15, pd.DataFrame):
+                    data['design_B15'] = {'design_events': loaded_b15}
+                else:
+                    data['design_B15'] = loaded_b15  # assume already nested
+
+        # -- Historical ----------------------------------------------------
+        if data['historical'] is None:
+            pkl_hist = PACKAGED_DATA_DIR / "HISTORICAL_packaged_data.pkl.gz"
+            if pkl_hist.exists():
+                with gzip.open(pkl_hist, 'rb') as f:
+                    data['historical'] = pickle.load(f)
+
+    except Exception as e:
+        st.error(f"Error while loading legacy packaged data: {e}")
+
     return data
 
 def get_available_models(data: Dict[str, Any]) -> List[Tuple[str, str]]:
@@ -158,7 +207,8 @@ def get_available_aeps(data: Dict[str, Any], model_type: str) -> List[float]:
         aep_col = 'aep'
     elif model_type == 'design_B15':
         df = data.get('design_B15', {}).get('design_events')
-        aep_col = 'AEP_Value'
+        # Prefer the years column if it exists, else use probability
+        aep_col = 'AEP_Years' if df is not None and 'AEP_Years' in df.columns else 'AEP_Value'
     else:
         return []
 
@@ -230,6 +280,52 @@ def get_available_climate_scenarios(data):
         return scenarios
     return []
 
+def get_available_durations(data, aep, location):
+    """Return sorted list of available storm durations (hours) for B15 model given AEP and location."""
+    df = data.get('design_B15', {}).get('design_events')
+    if df is None:
+        return []
+
+    # Identify duration column
+    duration_col = next((c for c in df.columns if 'duration' in c.lower()), None)
+    if duration_col is None:
+        return []
+
+    try:
+        aep_int = int(aep)
+    except (ValueError, TypeError):
+        return []
+
+    subset = df[(df.get('AEP_Years', df['AEP_Value']) == aep_int) & (df['location'] == location)]
+    if subset.empty:
+        return []
+
+    return sorted(subset[duration_col].dropna().unique())
+
+
+def get_available_storm_ids(data, aep, location, duration):
+    """Return list of available Storm_IDs for given AEP, location and duration."""
+    df = data.get('design_B15', {}).get('design_events')
+    if df is None:
+        return []
+
+    duration_col = next((c for c in df.columns if 'duration' in c.lower()), None)
+    storm_col = next((c for c in df.columns if 'storm' in c.lower() and 'id' in c.lower()), None)
+    if duration_col is None or storm_col is None:
+        return []
+
+    try:
+        aep_int = int(aep)
+    except (ValueError, TypeError):
+        return []
+
+    subset = df[(df.get('AEP_Years', df['AEP_Value']) == aep_int) & (df['location'] == location) & (df[duration_col] == duration)]
+    if subset.empty:
+        return []
+
+    return sorted(subset[storm_col].dropna().unique())
+
+
 def get_available_ensembles(data, aep, location):
     """Extracts available ensemble IDs from the B15 design data for a given AEP and location."""
     if not all([aep, location, aep != "Select an AEP"]):
@@ -250,100 +346,153 @@ def get_available_ensembles(data, aep, location):
         return sorted([int(e) for e in filtered_df['Ensemble_ID'].unique()])
     return []
 
-def map_location_name(location: str, model_type: str) -> str:
-    """Map location names between different model types if needed."""
-    return location
 
-# --- Page Implementations ---
 def show_historic_event_ui(data, col1, col2):
+    """UI and results display for historic calibration events."""
+    # Sidebar debug toggle
+    debug_mode_hist = st.sidebar.checkbox("🛠 Show Historic Data Debug", value=False)
+    #LAM# st.subheader("🔍 Debug – Raw historical dictionary")
+    #LAM# st.json(st.session_state.packaged_data.get('historical', {}))
+
     historic_events = data.get('historic_events', [])
     if not historic_events:
         st.warning("No historic events found in the data file.")
         return
-
+    
     with col1:
         st.subheader("Historic Event")
-        selected_event = st.selectbox("Select a Historic Calibration Event: (YYYYMMDD)", sorted(historic_events, reverse=True), key="historic_event_selector")
+        selected_event = st.selectbox(
+            "Select a Historic Calibration Event: (YYYYMMDD)",
+            sorted(historic_events, reverse=True),
+            key="historic_event_selector",
+        )
         show_no_dams = st.checkbox("Compare with 'No Dams' Scenario", value=True)
 
         # --- State Management & Buttons ---
-        # Initialize state
         if 'show_historic_results' not in st.session_state:
             st.session_state.show_historic_results = False
         if 'historic_run_complete' not in st.session_state:
             st.session_state.historic_run_complete = False
 
-        # If selection changes, reset state
-        if 'historic_run_key' in st.session_state and st.session_state.historic_run_key != selected_event:
+        # Reset state if selection changes
+        if st.session_state.get('historic_run_key') not in (None, selected_event):
             st.session_state.show_historic_results = False
             st.session_state.historic_run_complete = False
 
-        # --- Buttons ---
+        # Run button -> simulate model run
         if st.button("▶️ Run URBS", use_container_width=True, key="run_historic", type="primary"):
             st.session_state.historic_run_key = selected_event
             st.session_state.show_historic_results = True
-            st.session_state.historic_run_complete = False  # Reset completion state on new run
+            st.session_state.historic_run_complete = False
             st.rerun()
 
-        st.button("✅ Export to TUFLOW", use_container_width=True, key="export_historic", disabled=not st.session_state.get('historic_run_complete', False), type="primary")
-        
+        # Export button (enabled once run complete)
+        st.button(
+            "✅ Export to TUFLOW",
+            use_container_width=True,
+            key="export_historic",
+            disabled=not st.session_state.get('historic_run_complete', False),
+            type="primary",
+        )
+
+        # Reset button
         if st.button("🔄 Reset Model", use_container_width=True, key="reset_historic"):
             st.session_state.show_historic_results = False
             st.session_state.historic_run_complete = False
-            if 'historic_run_key' in st.session_state:
-                del st.session_state['historic_run_key']
+            st.session_state.pop('historic_run_key', None)
             st.rerun()
 
     with col2:
         st.header("Event Data Analysis")
         if st.session_state.get('show_historic_results', False):
-            # If run isn't complete yet, show spinner and simulate
+            # Simulate running time only once per run
             if not st.session_state.get('historic_run_complete', False):
                 with st.spinner("Model running..."):
                     time.sleep(4)
                     st.session_state.historic_run_complete = True
-                    st.rerun() # Rerun to show results and enable button
+                    st.rerun()
 
-            # Display results now that run is complete
             event = st.session_state.historic_run_key
             st.success(f"Displaying data for Historic Event: **{event}**")
-            
+
             st.subheader("Model Parameters")
-            model_params_df = data['with_dams'][event]['params']
+            # Safely fetch params and timeseries for the selected event
+            with_dams_dict = data.get('with_dams', {})
+            event_data = with_dams_dict.get(event, {})
+            model_params_df = event_data.get('params', pd.DataFrame())
             if not model_params_df.empty:
                 st.dataframe(model_params_df, use_container_width=True)
 
-            timeseries_data = data['with_dams'][event]['timeseries']
-            nodam_timeseries_data = data['no_dams'][event]['timeseries'] if show_no_dams else pd.DataFrame()
+            timeseries_data = event_data.get('timeseries', pd.DataFrame())
+            nodam_timeseries_data = pd.DataFrame()
+            if show_no_dams:
+                nodam_timeseries_data = (
+                    data.get('no_dams', {}).get(event, {}).get('timeseries', pd.DataFrame())
+                )
 
             if timeseries_data.empty:
                 st.warning(f"Could not load base timeseries data for event: {event}")
+                if debug_mode_hist:
+                    st.subheader("Debug – Available Data Objects (All Events)")
+                    st.write("with_dams keys:", list(with_dams_dict.keys()))
+                    st.write("no_dams keys:", list(data.get('no_dams', {}).keys()))
+
+                    # Build a quick summary table of each event
+                    summary_rows = []
+                    for evt_key, evt_val in with_dams_dict.items():
+                        params_shape = evt_val.get('params', pd.DataFrame()).shape
+                        ts_shape = evt_val.get('timeseries', pd.DataFrame()).shape
+                        summary_rows.append({
+                            'Event': evt_key,
+                            'Params rows': params_shape[0],
+                            'Params cols': params_shape[1],
+                            'TS rows': ts_shape[0],
+                            'TS cols': ts_shape[1],
+                        })
+                    if summary_rows:
+                        st.dataframe(pd.DataFrame(summary_rows))
+                    else:
+                        st.info("No with_dams event data found.")
                 return
 
             tab1, tab2 = st.tabs(["📈 Time Series", "📊 Peak Flows"])
 
+            # --- Time-series tab ---
             with tab1:
                 st.subheader("Flow Time Series Analysis")
-                all_locs = sorted(list(set([c.split(' (')[0] for c in timeseries_data.columns if isinstance(c, str)])))
+                all_locs = sorted({c.split(' (')[0] for c in timeseries_data.columns if isinstance(c, str)})
                 selected_loc = st.selectbox("Select Location to Plot:", all_locs, key="historic_loc_selector")
 
                 if selected_loc:
                     plot_df = pd.DataFrame(index=timeseries_data.index)
-                    if f"{selected_loc} (R)" in timeseries_data: plot_df['Recorded'] = timeseries_data[f"{selected_loc} (R)"]
-                    if f"{selected_loc} (C)" in timeseries_data: plot_df['Modelled (With Dams)'] = timeseries_data[f"{selected_loc} (C)"]
-                    if not nodam_timeseries_data.empty and f"{selected_loc} (C)" in nodam_timeseries_data: plot_df['Modelled (No Dams)'] = nodam_timeseries_data[f"{selected_loc} (C)"]
-                    if not plot_df.empty: st.line_chart(plot_df)
+                    if f"{selected_loc} (R)" in timeseries_data:
+                        plot_df['Recorded'] = timeseries_data[f"{selected_loc} (R)"]
+                    if f"{selected_loc} (C)" in timeseries_data:
+                        plot_df['Modelled (With Dams)'] = timeseries_data[f"{selected_loc} (C)"]
+                    if not nodam_timeseries_data.empty and f"{selected_loc} (C)" in nodam_timeseries_data:
+                        plot_df['Modelled (No Dams)'] = nodam_timeseries_data[f"{selected_loc} (C)"]
+                    if not plot_df.empty:
+                        st.line_chart(plot_df)
 
+            # --- Peak-flows tab ---
             with tab2:
                 st.subheader("Peak Flows at Key Locations")
                 numeric_ts_data = timeseries_data.select_dtypes(include='number')
-                summary_df = pd.concat([
-                    numeric_ts_data.filter(like='(R)').max().rename('Recorded'),
-                    numeric_ts_data.filter(like='(C)').max().rename('Modelled (With Dams)')
-                ], axis=1)
+                summary_df = pd.concat(
+                    [
+                        numeric_ts_data.filter(like='(R)').max().rename('Recorded'),
+                        numeric_ts_data.filter(like='(C)').max().rename('Modelled (With Dams)'),
+                    ],
+                    axis=1,
+                )
 
                 if not nodam_timeseries_data.empty:
-                    nodam_peaks = nodam_timeseries_data.select_dtypes(include='number').filter(like='(C)').max().rename('Modelled (No Dams)')
+                    nodam_peaks = (
+                        nodam_timeseries_data.select_dtypes(include='number')
+                        .filter(like='(C)')
+                        .max()
+                        .rename('Modelled (No Dams)')
+                    )
                     summary_df = pd.concat([summary_df, nodam_peaks], axis=1)
 
                 summary_df.index.name = 'Location'
@@ -352,9 +501,40 @@ def show_historic_event_ui(data, col1, col2):
         else:
             st.info("👈 Select a historic event and click 'Run URBS' to display results.")
 
+        # Optional debug panel when data available
+        if debug_mode_hist and st.session_state.get('show_historic_results', False) and not timeseries_data.empty:
+            with st.expander("🔍 Raw Historic Event Data (All Events)"):
+                # Summary of all event data
+                summary_rows = []
+                for evt_key, evt_val in with_dams_dict.items():
+                    params_shape = evt_val.get('params', pd.DataFrame()).shape
+                    ts_shape = evt_val.get('timeseries', pd.DataFrame()).shape
+                    summary_rows.append({
+                        'Event': evt_key,
+                        'Params rows': params_shape[0],
+                        'Params cols': params_shape[1],
+                        'TS rows': ts_shape[0],
+                        'TS cols': ts_shape[1],
+                    })
+                if summary_rows:
+                    st.subheader("Event Data Summary")
+                    st.dataframe(pd.DataFrame(summary_rows))
+                else:
+                    st.info("No historic event data loaded in with_dams dict.")
+
+                # Detailed view for selected event
+                st.subheader(f"Selected Event – {event}")
+                st.write("Model Parameters")
+                st.dataframe(model_params_df.head(20))
+                st.write("Timeseries sample")
+                st.dataframe(timeseries_data.head(20))
+
+
 def show_design_event_ui():
     """Displays the UI for selecting and visualizing design flood events."""
     col1, col2 = st.columns([1, 2])
+    # Sidebar toggle to show raw data for debugging purposes
+    debug_mode = st.sidebar.checkbox("🛠 Show Design Data Debug", value=False)
 
     if 'packaged_data' not in st.session_state:
         with st.spinner("Loading data..."):
@@ -405,310 +585,321 @@ def show_design_event_ui():
 
         available_locations = get_available_locations(data, model_key, selected_aep)
         if not available_locations or len(available_locations) <= 1:
-            st.warning("No locations found for the selected criteria.")
-            display_name = None
-            original_location = None
+            st.warning(f"No location data available for {selected_model_display} with AEP {selected_aep}.")
+            selected_location = None
         else:
             try:
-                default_loc_index = available_locations.index(st.session_state.get('selected_location_tuple', available_locations[0]))
+                # Find index for default value
+                loc_ids = [loc[1] for loc in available_locations]
+                default_loc_index = loc_ids.index(st.session_state.get('selected_location_id'))
             except (ValueError, TypeError):
                 default_loc_index = 0
-
-            selected_location_tuple = st.selectbox(
+            
+            selected_location_display, selected_location_id = st.selectbox(
                 "Select Location:",
                 options=available_locations,
                 index=default_loc_index,
-                key='selected_location_tuple',
-                format_func=lambda x: x[0]
+                format_func=lambda x: x[0],
+                key='location_selector'
             )
+            st.session_state.selected_location_display = selected_location_display
+            st.session_state.selected_location_id = selected_location_id
 
-            if selected_location_tuple and len(selected_location_tuple) == 2 and selected_location_tuple[1]:
-                display_name = selected_location_tuple[0]
-                original_location = selected_location_tuple[1]
-            else:
-                display_name = None
-                original_location = None
+        # --- Duration selection for B15 ---
+        selected_duration = None
+        if model_key == 'design_B15' and selected_aep and selected_location_id:
+            durations = get_available_durations(data, selected_aep, selected_location_id)
+            if durations:
+                selected_duration = st.selectbox("Select Storm Duration (hrs):", options=durations, key='duration_selector')
 
-        if model_key == 'design_MC':
-            climate_scenarios = get_available_climate_scenarios(data)
-            if climate_scenarios:
-                st.selectbox(
-                    "Select Climate Scenario:",
-                    options=climate_scenarios,
-                    key='selected_climate_scenario'
-                )
-        
-        elif model_key == 'design_B15':
-            # Get current selections to filter the ensemble list dynamically
-            selected_aep = st.session_state.get('selected_aep')
-            selected_loc_tuple = st.session_state.get('selected_location_tuple')
-            original_location = selected_loc_tuple[1] if selected_loc_tuple and len(selected_loc_tuple) > 1 else None
+        # --- Storm ID selection for B15 ---
+        selected_storm_id = None
+        if model_key == 'design_B15' and selected_aep and selected_location_id and selected_duration is not None:
+            storm_ids = get_available_storm_ids(data, selected_aep, selected_location_id, selected_duration)
+            if storm_ids:
+                selected_storm_id = st.selectbox("Select Storm ID:", options=storm_ids, key='stormid_selector')
 
-            ensembles = get_available_ensembles(data, selected_aep, original_location)
+        # --- Ensemble selection for B15 model ---
+        selected_ensemble = None
+        if model_key == 'design_B15' and selected_aep and selected_location_id:
+            available_ensembles = get_available_ensembles(data, selected_aep, selected_location_id)
+            #if available_ensembles:
+            #    selected_ensemble = st.selectbox("Select Ensemble Member:", options=available_ensembles, key='ensemble_selector')
+
+                # --- Duration & Ensemble for Monte Carlo model ---
+        mc_selected_duration = None
+        mc_selected_ensemble = None
+        if model_key == 'design_MC' and selected_aep and selected_location_id:
+            mc_durations = get_available_durations_mc(data, selected_aep, selected_location_id)
+            if mc_durations:
+                mc_selected_duration = st.selectbox("Select Storm Duration (hrs):", options=mc_durations, key='mc_duration_selector')
+                mc_ensembles = get_available_ensembles_mc(data, selected_aep, selected_location_id, mc_selected_duration)
+                if mc_ensembles:
+                    mc_selected_ensemble = st.selectbox("Select Ensemble Member:", options=mc_ensembles, key='mc_ensemble_selector')
             
-            if ensembles:
-                st.selectbox(
-                    "Select Ensemble ID:",
-                    options=ensembles,
-                    key='selected_ensemble_id'
-                )
-            else:
-                st.info("Select an AEP and Location to see available ensembles.")
+        # --- Climate scenario for MC model ---
+        selected_climate_scenario = None
+        if model_key == 'design_MC':
+            available_scenarios = get_available_climate_scenarios(data)
+            if available_scenarios:
+                selected_climate_scenario = st.selectbox("Select Climate Scenario:", options=available_scenarios, key='climate_selector')
 
-        if st.button("Run Analysis", key='run_analysis_button'):
-            if model_key and selected_aep and original_location and selected_aep != "Select an AEP":
-                st.session_state.design_run_key = (model_key, selected_aep, display_name)
-                st.session_state.original_location_name = original_location
-                st.session_state.show_results = True
-                st.rerun()
-            else:
-                st.warning("Please ensure all selections are made before running the analysis.")
-                st.session_state.show_results = False
+        # --- Determine current selection signature for change detection ---
+        if model_key == 'design_MC':
+            current_sig = (model_key, selected_aep, selected_location_id, mc_selected_duration, mc_selected_ensemble, selected_climate_scenario)
+        else:  # design_B15
+            current_sig = (model_key, selected_aep, selected_location_id, selected_duration, selected_storm_id, selected_ensemble)
+        # Auto-reset results if any selector changed after a run
+        if st.session_state.get('show_results') and current_sig != st.session_state.get('last_run_sig'):
+            st.session_state.show_results = False
+
+        # --- Buttons ---
+        if st.button("▶️ Run URBS", use_container_width=True, key="run_design", type="primary"):
+            # Simulate model run time
+            with st.spinner("Running URBS model … please wait"):
+                time.sleep(4)
+            st.session_state.show_results = True
+            st.session_state.last_run_sig = current_sig
+            st.rerun()
+
+        st.button("✅ Export to TUFLOW", use_container_width=True, key="export_design", disabled=not st.session_state.get('show_results', False), type="primary")
+        
+        if st.button("🔄 Reset Model", use_container_width=True, key="reset_design"):
+            st.session_state.show_results = False
+            st.rerun()
 
     with col2:
+        st.header("Design Event Analysis")
+        if debug_mode and model_key in data and data[model_key]:
+            st.info(f"Debug — raw dataframe for {model_key}")
+            st.dataframe(data[model_key]['design_events'].head(200))
+            st.write("Unique AEP values:", data[model_key]['design_events'].get('AEP_Value', data[model_key]['design_events'].get('aep')).unique() if 'design_events' in data[model_key] else None)
+
+       
         if st.session_state.get('show_results', False):
-            display_design_results()
+            # Determine which duration/ensemble to pass based on model type
+            dur_arg = mc_selected_duration if model_key == 'design_MC' else selected_duration
+            ens_arg = mc_selected_ensemble if model_key == 'design_MC' else selected_ensemble
+            display_design_results(
+                 data=data,
+                 model_key=model_key,
+                 aep=selected_aep,
+                 location_id=selected_location_id,
+                 ensemble=ens_arg,
+                 duration=dur_arg,
+                storm_id=selected_storm_id,
+                climate_scenario=selected_climate_scenario
+            )
         else:
-            st.info("👈 Select a model, AEP, and location, then click 'Run Analysis' to display results.")
-            st.markdown("---")
-            with st.expander("About Model Types"):
-                st.markdown("""
-                - **URBS Monte Carlo Design Runs**: Contains probabilistic design events from the URBS model
-                - **Design Events**: Contains traditional design storm events
-                
-                Note: Location names may vary between model types. Each model type maintains its own location naming convention.
-                """)
+            st.info("👈 Select a design event and click 'Run URBS' to display results.")
 
-def display_design_results():
+
+def display_design_results(
+    data: Dict[str, Any],
+    model_key: str,
+    aep: Optional[float],
+    location_id: Optional[str],
+    ensemble: Optional[int] = None,
+    duration: Optional[float] = None,
+    storm_id: Optional[int] = None,
+    climate_scenario: Optional[str] = None
+):
     """Display the design event results based on user selection."""
-    if 'design_run_key' not in st.session_state or not st.session_state.design_run_key:
+    if not all([model_key, aep, location_id]):
+        st.warning("Please ensure Model, AEP, and Location are selected.")
         return
 
-    model_key, aep, location = st.session_state.design_run_key
-
-    if not all([model_key, aep, location]):
-        st.warning("Please complete your selection (Model, AEP, and Location).")
+    df = data.get(model_key, {}).get('design_events')
+    if df is None or df.empty:
+        st.error(f"No data found for model: {model_key}")
         return
 
-    original_location = st.session_state.get('original_location_name', location)
-    model_name_map = {key: name for name, key in get_available_models(st.session_state.packaged_data)}
-    model_name = model_name_map.get(model_key, "Unknown Model")
-    data = st.session_state.packaged_data
-    
-    selected_scenario = st.session_state.get('selected_climate_scenario')
-    subheader_text = f"{model_name} - {location} (1 in {int(aep)} AEP)"
-    if model_key == 'design_MC' and selected_scenario and selected_scenario != "Select a scenario":
-        subheader_text += f" - Scenario: {selected_scenario}"
-    st.subheader(subheader_text)
-    
-    if model_key == 'design_MC':
-        df = data.get('design_MC', {}).get('design_events')
-        aep_col = 'aep'
-    elif model_key == 'design_B15':
-        df = data.get('design_B15', {}).get('design_events')
-        aep_col = 'AEP_Value'  # Corrected column name
-    else:
-        st.error("Invalid model type selected.")
-        return
+    st.subheader(f"Results for {st.session_state.selected_model_display}")
+    st.markdown(f"**AEP:** `1 in {int(aep)}` | **Location:** `{st.session_state.selected_location_display}`")
+    if ensemble:
+        st.markdown(f"**Ensemble:** `{ensemble}`")
+    if climate_scenario and climate_scenario != "Select a scenario":
+        st.markdown(f"**Climate Scenario:** `{climate_scenario}`")
 
-    if df is None:
-        st.error("No data available for the selected model.")
-        return
-
-
-
-    df_copy = df.copy()
-    numeric_aep_col = 'numeric_aep_for_filter'
-
+    # --- Filtering Logic ---
     def parse_aep_value(val):
         if isinstance(val, str):
-            numbers = re.findall(r'\d+\.?\d*', val)
-            if numbers:
-                return float(numbers[-1])
-        elif isinstance(val, (int, float, np.number)):
-            return float(val)
-        return np.nan
+            numbers = re.findall(r'\d+', val)
+            return int(numbers[-1]) if numbers else None
+        return val
 
-    if aep_col in df_copy.columns:
-        df_copy[numeric_aep_col] = df_copy[aep_col].apply(parse_aep_value)
-        filtered_data = df_copy[(df_copy[numeric_aep_col] == aep) & (df_copy['location'] == original_location)]
-
-        # Also filter by climate scenario if applicable for Monte Carlo
+    try:
         if model_key == 'design_MC':
-            selected_scenario = st.session_state.get('selected_climate_scenario')
-            if selected_scenario and selected_scenario != "Select a scenario":
-                if 'climate_scenario_code' in filtered_data.columns:
-                    filtered_data = filtered_data[filtered_data['climate_scenario_code'] == selected_scenario]
-                else:
-                    st.warning("'climate_scenario_code' column not found for scenario filtering.")
-    else:
-        st.error(f"AEP column '{aep_col}' not found in the data for {model_name}.")
-        return
-    
-    if filtered_data.empty:
-        warning_message = f"No data found for AEP={aep} and Location='{original_location}'"
-        if model_key == 'design_MC':
-            selected_scenario = st.session_state.get('selected_climate_scenario')
-            if selected_scenario and selected_scenario != "Select a scenario":
-                warning_message += f" and Scenario='{selected_scenario}'"
-        warning_message += "."
-        st.warning(warning_message)
-        return
-
-
-
-    st.session_state.filtered_data = filtered_data
-    
-    if filtered_data.empty:
-        st.warning("No data available for the selected criteria.")
-        return
-
-    tab1, tab2 = st.tabs(["📈 Time Series", "📄 Data Table"])
-
-    with tab1:
-        plot_data = filtered_data.copy()
-        time_col_found = False
-        
-        # Case 1: Time information is in the index
-        if plot_data.index.name in ['datetime', 'TimeStep', 'date', 'time', 'TimeStep_hrs'] and pd.api.types.is_datetime64_any_dtype(plot_data.index):
-            time_col_found = True
-            time_col = plot_data.index.name
-            plot_data.index = pd.to_datetime(plot_data.index, errors='coerce')
-            
-        # Case 2: Time information is in a column
+            mask = (df['aep'].apply(parse_aep_value) == int(aep)) & (df['location'] == location_id)
+            # duration filter
+            dur_col = next((c for c in df.columns if 'duration' in c.lower()), None)
+            if dur_col and duration is not None:
+                mask &= (df[dur_col] == duration)
+            # ensemble filter
+            ens_col = next((c for c in df.columns if 'ensemble' in c.lower()), None)
+            if ens_col and ensemble is not None:
+                mask &= (df[ens_col] == ensemble)
+            if climate_scenario and climate_scenario != "Select a scenario":
+                mask &= (df['climate_scenario_code'] == climate_scenario)
+        elif model_key == 'design_B15':
+            mask = (df['AEP_Years'] == int(aep)) & (df['location'] == location_id)
+            # add duration filter if column present and provided
+            duration_col = next((c for c in df.columns if 'duration' in c.lower()), None)
+            if duration_col and duration is not None:
+                mask &= (df[duration_col] == duration)
+            # add storm id filter
+            storm_col = next((c for c in df.columns if 'storm' in c.lower() and 'id' in c.lower()), None)
+            if storm_col and storm_id is not None:
+                mask &= (df[storm_col] == storm_id)
+            if ensemble:
+                mask &= (df['Ensemble_ID'] == ensemble)
         else:
-            time_col = next((col for col in ['datetime', 'time_hours', 'TimeStep', 'date', 'time'] if col in plot_data.columns), None)
-            if time_col:
-                time_col_found = True
-                if time_col == 'time_hours':
-                    # The 'time_hours' column is already numeric and represents hours.
-                    # We can set it as index directly.
-                    plot_data = plot_data.set_index(time_col)
-                else:
-                    plot_data[time_col] = pd.to_datetime(plot_data[time_col], errors='coerce')
-                    plot_data = plot_data.set_index(time_col)
+            st.error("Invalid model type selected.")
+            return
+    except Exception as e:
+        st.error(f"Error during filtering: {e}")
+        return
 
-        flow_col = next((col for col in ['flow_rate', 'flow', 'value'] if col in plot_data.columns), None)
+    event_df = df[mask]
 
-        if time_col_found and flow_col:
-            plot_data.dropna(subset=[flow_col], inplace=True)
-            plot_data[flow_col] = pd.to_numeric(plot_data[flow_col], errors='coerce')
-            plot_data.dropna(subset=[flow_col], inplace=True)
+    if event_df.empty:
+        st.warning("No data found for the current selection.")
+        st.write("Debug Info:")
+        st.json({
+            'model_key': model_key,
+            'aep': aep,
+            'location_id': location_id,
+            'ensemble': ensemble,
+            'climate_scenario': climate_scenario,
+            'mask_sum': mask.sum() if 'mask' in locals() else 'N/A'
+        })
+        return
 
-            col1, col2 = st.columns([1, 2])
-
-            with col1:
-                st.markdown("#### Peak Flow Distribution")
-                if model_key == 'design_B15' and 'Ensemble_ID' in filtered_data.columns:
-                    peak_flows = filtered_data.groupby('Ensemble_ID')[flow_col].max().reset_index()
-                    
-                    if not peak_flows.empty:
-                        # Base chart for layering
-                        base = alt.Chart(peak_flows)
-
-                        # Box plot layer
-                        boxplot = base.mark_boxplot(
-                            extent='min-max',
-                            size=50
-                        ).encode(
-                            y=alt.Y(f'{flow_col}:Q', title='Peak Flow (m³/s)')
-                        )
-
-                        # Jittered scatter plot layer for individual data points
-                        points = base.mark_circle(
-                            color='black',
-                            size=20
-                        ).encode(
-                            x=alt.X('jitter:Q', title=None, axis=alt.Axis(grid=False, ticks=False, labels=False)),
-                            y=alt.Y(f'{flow_col}:Q')
-                        ).transform_calculate(
-                            # Generate a random number between -1 and 1 for jitter
-                            jitter='2 * random() - 1'
-                        ).properties(
-                            # Define the width of the jitter area
-                            width=30
-                        )
-
-                        # Layer the charts
-                        chart = (boxplot + points).properties(
-                            title='Distribution of Peak Flows'
-                        )
-                        st.altair_chart(chart, use_container_width=True)
-                    else:
-                        st.warning("No peak flow data to display in box plot.")
-                else:
-                    st.info("Box plot of peaks is available for B15 ensembles.")
-
-            with col2:
-                st.markdown("#### Flow Time Series")
-                
-                # Use a different variable for the line chart data to avoid modifying the original filtered data
-                line_chart_data = plot_data
-                if model_key == 'design_B15':
-                    selected_ensemble = st.session_state.get('selected_ensemble_id')
-                    if selected_ensemble:
-                        # Filter the data for the line chart to the selected ensemble
-                        line_chart_data = plot_data[plot_data['Ensemble_ID'] == selected_ensemble]
-                        st.info(f"Showing time series for Ensemble {selected_ensemble}")
-                    else:
-                        st.warning("Select an ensemble to view its time series.")
-                        line_chart_data = pd.DataFrame() # Clear the chart if no ensemble is selected
-
-                if not line_chart_data.empty:
-                    st.line_chart(line_chart_data[flow_col])
-                elif model_key == 'design_B15':
-                    st.info("Time series for the selected ensemble will be displayed here.")
-
-        elif not time_col_found:
-            st.warning("Could not find a suitable time column for plotting.")
-        elif not flow_col:
-            st.warning("Could not find a suitable flow/value column for plotting.")
+    # --- Create Plots ---
+    st.markdown("### Hydrographs")
+    
+    # Use tabs for a cleaner layout
+    tab2, tab1 = st.tabs(["Flow", "Water Level"])
 
     with tab2:
-        # Exclude confusing columns from the data table view
-        cols_to_drop = ['TimeStep', 'TimeStep_hrs', 'AEP_Years']
-        display_df = filtered_data.drop(columns=[col for col in cols_to_drop if col in filtered_data.columns])
-        st.dataframe(display_df, use_container_width=True)
+        if model_key == 'design_B15' and 'flow_rate' in event_df.columns:
+            flow_df = event_df[['time_hours', 'flow_rate']].rename(columns={'flow_rate': 'Flow (m³/s)', 'time_hours': 'Time (hours)'})
+            st.line_chart(flow_df.set_index('Time (hours)'))
+        elif 'qts' in event_df.columns:
+            qts_df = event_df[['time_hours', 'qts']].rename(columns={'qts': 'Flow (m³/s)', 'time_hours': 'Time (hours)'})
+            st.line_chart(qts_df.set_index('Time (hours)'))
+        elif 'flow_rate' in event_df.columns:
+            fr_df = event_df[['time_hours', 'flow_rate']].rename(columns={'flow_rate': 'Flow (m³/s)', 'time_hours': 'Time (hours)'})
+            st.line_chart(fr_df.set_index('Time (hours)'))
+        else:
+            st.info("No flow data available for this selection.")
+
+    with tab1:
+        if 'hts' in event_df.columns:
+            hts_df = event_df[['time_hours', 'hts']].rename(columns={'hts': 'Water Level (m)', 'time_hours': 'Time (hours)'})
+            st.line_chart(hts_df.set_index('Time (hours)'))
+        else:
+            st.info("Feature not yet implemented.")
+    
 
 
+    # --- Display Raw Data Table ---
+    with st.expander("View Raw Data for Selection"):
+        st.dataframe(event_df)
+
+
+
+# --- Utility and Page Setup Functions ---
+
+def get_available_durations_mc(data, aep, location):
+    """Return sorted list of available storm durations for Monte Carlo model."""
+    df = data.get('design_MC', {}).get('design_events')
+    if df is None:
+        return []
+
+    duration_col = next((c for c in df.columns if 'duration' in c.lower()), None)
+    if duration_col is None:
+        return []
+
+    try:
+        aep_val = float(aep) if aep else None
+    except (ValueError, TypeError):
+        return []
+
+    subset = df[(df['aep'] == aep_val) & (df['location'] == location)] if aep_val else df[df['location'] == location]
+    if subset.empty:
+        return []
+
+    return sorted(subset[duration_col].dropna().unique())
+
+def get_available_ensembles_mc(data, aep, location, duration=None):
+    """Return list of available ensemble members for Monte Carlo model given filters."""
+    df = data.get('design_MC', {}).get('design_events')
+    if df is None:
+        return []
+
+    ensemble_col = next((c for c in df.columns if 'ensemble' in c.lower()), None)
+    if ensemble_col is None:
+        return []
+
+    filtered = df.copy()
+    if aep:
+        try:
+            aep_val = float(aep)
+            filtered = filtered[filtered['aep'] == aep_val]
+        except (ValueError, TypeError):
+            pass
+    if location:
+        filtered = filtered[filtered['location'] == location]
+    if duration is not None:
+        dur_col = next((c for c in df.columns if 'duration' in c.lower()), None)
+        if dur_col:
+            filtered = filtered[filtered[dur_col] == duration]
+
+    if filtered.empty:
+        return []
+
+    return sorted(filtered[ensemble_col].dropna().unique())
 
 def show_home_page(data):
-    st.markdown("## An interface to run BRCFS URBS model and visualise model inputs and outputs.")
+    st.title("Welcome to the URBS Flood Model Interface")
+    st.markdown("""
+    This application provides a light-weight interface to run and analyse URBS flood models.
     
-    col1, col2 = st.columns([1, 2])
+    **Getting Started:**
+    1.  Use the **Navigation** sidebar to select a page.
+    2.  **Historic Events:** Run and analyse past flood events.
+    3.  **Design Events:** Run and compare design ensemble design event scenarios.
+    4.  **Monte Carlo Events:** Run Monte Carlo design event scenarios.
+    5.  **Map:** View geospatial data related to the models.
+    6.  **Upload Data:** Upload rainfall to include in bespoke analysis.
+    7.  **Export URBS to TUFLOW:** Select and send URBS model run to TUFLOW
     
-    with col1:
-        st.info("Select a page from the sidebar to begin.")
+    *This application is currently under development and more features are being added.*
+    """)
+    
+    st.header("Available Data")
+    st.warning("This Project Runs URBS Ensemble Design Events, Monte Carlo and Historic Flood events.")
 
-    with col2:
-        st.header("Project Overview")
-        st.markdown("""
-        This application provides a comprehensive interface for the URBS flood model.
-        It allows for the analysis of both historic calibration events and synthetic design events.
-        
-        **Features:**
-        - **Historic Event Analysis**: Compare recorded flow data against 'With Dams' and 'No Dams' scenarios.
-        - **Design Event Analysis**: Filter and  visualise results from various design storms based on AEP, duration, and climate change scenarios.
-        - **Interactive  visualisations**: Plot time series data and view peak flow summaries.
-        - **Model Control**: Simulate model runs and export results for further analysis in tools like TUFLOW.
-        """)
 
 def add_geospatial_to_map(m, file_path, layer_name=None):
     """Add a KMZ, KML, or Shapefile to a folium map."""
-    try:                       
-        # Add to map
-        folium.GeoJson(file_path,               
-            name=layer_name or os.path.basename(file_path),            
-        ).add_to(m)
+    if not layer_name:
+        layer_name = Path(file_path).stem
+    
+    try:
+        folium.GeoJson(file_path, name=layer_name).add_to(m)
         return True
-            
     except Exception as e:
-        st.error(f"Error loading {file_path}: {str(e)}")
+        st.warning(f"Could not load {file_path}: {e}")
         return False
 
 def show_map_page():
-    st.header("Map")
-    m = folium.Map(location=[-27.4705, 153.0260], zoom_start=10)
+    st.header("Geospatial Map")
+    st.info("This page will display geospatial flood data when available.")
+    
+    # Create a basic map centered on Brisbane
+    m = folium.Map(location=[-27.4698, 152.90], zoom_start=9)
 
     # --- Load all GeoJSON files from the geo folder ---
     geo_dir = "geo"
@@ -724,63 +915,40 @@ def show_map_page():
                 layer_name = os.path.splitext(geojson_file)[0]  # Use filename without extension as layer name
                 if not add_geospatial_to_map(m, file_path, layer_name):
                     st.warning(f"Could not load {geojson_file}")
-    else:
-        st.warning(f"The '{geo_dir}' directory does not exist.")
-
-    # --- Uploaded file ---
-    if 'uploaded_spatial_file' in st.session_state and st.session_state.uploaded_spatial_file is not None:
-        file_ext = os.path.splitext(st.session_state.uploaded_spatial_file.name)[1].lower()
-        if file_ext in ('.kmz', '.kml', '.shp', '.geojson'):
-            with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp:
-                tmp.write(st.session_state.uploaded_spatial_file.getvalue())
-                tmp_path = tmp.name
-            
-            success = add_geospatial_to_map(m, tmp_path, "Uploaded Layer")
-            os.unlink(tmp_path)  # Clean up temp file
-            
-            if not success:
-                st.error("Failed to process uploaded file. Ensure it's a valid spatial file.")
-        else:
-            st.error("Unsupported file format. Please upload a KMZ, KML, or Shapefile.")
-
+    
     folium.LayerControl().add_to(m)
-    st_folium(m, width=1500, height=700)
+
+    # Display the map
+    st_folium(m, width=1500, height=600)
+
 
 def show_upload_page():
-    st.header("Upload Spatial Data")
-    st.write("Upload a zipped shapefile (.zip) or a KML file (.kml) to display on the map.")
-
-    # Initialize uploaded_spatial_file in session state if it doesn't exist
-    if 'uploaded_spatial_file' not in st.session_state:
-        st.session_state.uploaded_spatial_file = None
-
-    uploaded_file = st.file_uploader(
-        "Choose a file",
-        type=['zip', 'kml', 'kmz', 'shp', 'geojson']
-    )
-
+    st.header("Upload Data")
+    st.info("Upload your own data for analysis.")
+    
+    uploaded_file = st.file_uploader("Choose a file")
+    
     if uploaded_file is not None:
-        st.session_state.uploaded_spatial_file = uploaded_file
-        st.success(f"File '{uploaded_file.name}' uploaded successfully! Go to the 'Map' page to see it.")
+        st.success("File uploaded successfully!")
+        # Add file processing logic here
 
 def show_model_performance_page():
-    import os
     st.header("Model Performance")
+    st.info("This page will display model performance metrics when available.")
+    
+    # Example: Display a log file
     log_file_path = "data/urbsout.log"
-
-    st.subheader("Latest Model Run Details (Dummy Data)")
-    st.markdown(f"""- **Last Model Run:** {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n- **Run Duration:** 23.1 seconds\n- **Status:** Success\n- **Errors:** None""")
-
-    with st.expander("View Raw URBS Output Log (`urbsout.log`)"):
-        if os.path.exists(log_file_path):
-            try:
-                with open(log_file_path, 'r') as f:
-                    log_content = f.read()
-                st.code(log_content, language='log')
-            except Exception as e:
-                st.error(f"An error occurred while reading the log file: {e}")
-        else:
-            st.warning(f"Log file not found at: {log_file_path}")
+    st.subheader("Model Run Log")
+    
+    if os.path.exists(log_file_path):
+        try:
+            with open(log_file_path, 'r') as f:
+                log_content = f.read()
+            st.code(log_content, language='log')
+        except Exception as e:
+            st.error(f"An error occurred while reading the log file: {e}")
+    else:
+        st.warning(f"Log file not found at: {log_file_path}")
 
 def show_download_page():
     st.info("Options to download model results and exported data will be available here.")
@@ -801,8 +969,25 @@ def show_settings_page():
     st.info("Application settings and user preferences will be configured here.")
 
 def show_feedback_page():
+    """Simple feedback form collecting an email and message and storing in session state."""
     st.header("User Feedback")
-    st.write("We value your feedback! Please let us know your thoughts.")
+    st.write("We value your feedback! Please let us know your thoughts below.")
+
+    email = st.text_input("Your email address (optional):")
+    feedback_text = st.text_area("Your feedback:")
+
+    if st.button("Submit Feedback", use_container_width=True):
+        if not feedback_text.strip():
+            st.warning("Please enter some feedback before submitting.")
+        else:
+            entry = {
+                "timestamp": datetime.datetime.now().isoformat(timespec='seconds'),
+                "email": email.strip(),
+                "feedback": feedback_text.strip(),
+            }
+            # Store feedback locally in session state for this run; could be replaced with persisting to DB/email.
+            st.session_state.setdefault("submitted_feedback", []).append(entry)
+            st.success("Thank you for your feedback! 🙌")
 
 
 
@@ -870,7 +1055,12 @@ def main():
         if 'historical' in st.session_state.get('packaged_data', {}):
             show_historic_event_ui(st.session_state.packaged_data['historical'], col1, col2)
         else:
-            st.warning("No historical data available. Please check your packaged data files.")
+            #st.warning("Historical data loading... Please wait.")
+            #if 'packaged_data' not in st.session_state:
+            with st.spinner("Loading data..."):
+                st.session_state.packaged_data = load_packaged_data()
+                show_historic_event_ui(st.session_state.packaged_data['historical'], col1, col2)
+
     elif page == "Design Events":
         show_design_event_ui()
     elif page == "Map":
@@ -897,3 +1087,5 @@ if __name__ == "__main__":
     
     # Run the main app
     main()
+
+

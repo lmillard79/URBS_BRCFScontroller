@@ -1,9 +1,20 @@
-streamlit==1.45.1
-pandas>=2.2.2
-numpy==1.26.4
-matplotlib==3.8.2
-openpyxl==3.1.2
-folium==0.20.0
-streamlit-folium==0.24.1
-geopandas==0.14.3
+# Core Streamlit App
+streamlit>=1.33.0
+pandas>=2.2.0
+numpy>=1.26.0
 
+# Data Handling (for Parquet files)
+pyarrow==15.0.2
+
+# Visualization
+plotly>=5.18.0
+altair>=5.2.0
+matplotlib>=3.8.0
+
+# Geospatial Maps
+folium>=0.15.0
+streamlit-folium>=0.21.0
+
+# Utilities
+python-dateutil>=2.8.2
+regex>=2023.12.25

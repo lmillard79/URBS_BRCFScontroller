@@ -1,0 +1,50 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="32" cy="32" r="30" fill="#1e4164" stroke="#00539b" stroke-width="2"/>
+  
+  <!-- Upper reservoir -->
+  <rect x="18" y="8" width="28" height="8" rx="2" fill="#00928f" stroke="#00539b" stroke-width="1"/>
+  <rect x="20" y="10" width="24" height="4" rx="1" fill="#6dcff6" opacity="0.8"/>
+  
+  <!-- Water fall streams -->
+  <path d="M24 16 Q22 20 24 24 Q26 28 24 32 Q22 36 24 40 Q26 44 24 48" 
+        stroke="#6dcff6" stroke-width="3" fill="none" opacity="0.9"/>
+  <path d="M32 16 Q30 20 32 24 Q34 28 32 32 Q30 36 32 40 Q34 44 32 48" 
+        stroke="#00b49d" stroke-width="4" fill="none" opacity="0.8"/>
+  <path d="M40 16 Q42 20 40 24 Q38 28 40 32 Q42 36 40 40 Q38 44 40 48" 
+        stroke="#6dcff6" stroke-width="3" fill="none" opacity="0.9"/>
+  
+  <!-- Water droplets falling -->
+  <circle cx="26" cy="20" r="1.5" fill="#6dcff6" opacity="0.7"/>
+  <circle cx="34" cy="22" r="1.5" fill="#00b49d" opacity="0.7"/>
+  <circle cx="38" cy="18" r="1.5" fill="#6dcff6" opacity="0.7"/>
+  
+  <circle cx="22" cy="28" r="1.5" fill="#00b49d" opacity="0.7"/>
+  <circle cx="36" cy="30" r="1.5" fill="#6dcff6" opacity="0.7"/>
+  <circle cx="28" cy="32" r="1.5" fill="#00b49d" opacity="0.7"/>
+  
+  <circle cx="30" cy="38" r="1.5" fill="#6dcff6" opacity="0.7"/>
+  <circle cx="42" cy="36" r="1.5" fill="#00b49d" opacity="0.7"/>
+  <circle cx="25" cy="42" r="1.5" fill="#6dcff6" opacity="0.7"/>
+  
+  <!-- Lower collection pool -->
+  <ellipse cx="32" cy="52" rx="20" ry="6" fill="#00928f" stroke="#00539b" stroke-width="1"/>
+  <ellipse cx="32" cy="50" rx="18" ry="4" fill="#6dcff6" opacity="0.8"/>
+  
+  <!-- Water splash effects -->
+  <path d="M14 50 Q16 48 18 50" stroke="#6dcff6" stroke-width="2" fill="none" opacity="0.6"/>
+  <path d="M46 50 Q48 48 50 50" stroke="#6dcff6" stroke-width="2" fill="none" opacity="0.6"/>
+  
+  <!-- Energy/flow indicator -->
+  <polygon points="48,12 52,12 50,16 54,16 48,24 46,20 50,20" fill="#d7df23"/>
+  
+  <!-- Flow direction arrows -->
+  <path d="M12 32 L16 36 L12 40" stroke="#8dc63f" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M52 32 L48 36 L52 40" stroke="#8dc63f" stroke-width="2" fill="none" stroke-linecap="round"/>
+  
+  <!-- Mist/spray effects -->
+  <circle cx="18" cy="46" r="1" fill="#d3bd2a" opacity="0.6"/>
+  <circle cx="46" cy="46" r="1" fill="#d3bd2a" opacity="0.6"/>
+  <circle cx="15" cy="44" r="0.8" fill="#d7df23" opacity="0.5"/>
+  <circle cx="49" cy="44" r="0.8" fill="#d7df23" opacity="0.5"/>
+</svg>
