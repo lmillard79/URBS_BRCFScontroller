@@ -872,11 +872,11 @@ def show_home_page(data):
     
     **Getting Started:**
     1.  Use the **Navigation** sidebar to select a page.
-    2.  **Historic Events:** Run and analyse past flood events.
-    3.  **Design Events:** Run and compare design ensemble design event scenarios.
-    4.  **Monte Carlo Events:** Run Monte Carlo design event scenarios.
+    2.  **Historic Events:** View and compare with past flood events (with or without dams).
+    3.  **Design Events:** Examine ensemble design event scenarios at any location for any configuration.
+    4.  **Monte Carlo Events:** View any of the previously run Monte Carlo design event scenarios.
     5.  **Map:** View geospatial data related to the models.
-    6.  **Upload Data:** Upload rainfall to include in bespoke analysis.
+    6.  **Upload Data:** Upload GIS or rainfall to include in bespoke analysis and compare with other models.
     7.  **Export URBS to TUFLOW:** Select and send URBS model run to TUFLOW
     
     *This application is currently under development and more features are being added.*
@@ -886,7 +886,7 @@ def show_home_page(data):
     
         # Example: Display a log file
     file_path = "data/frontpage.md"
-    st.subheader("An introduction to this Web Application")
+    st.subheader("An Introduction to this Web Application")
 
     if os.path.exists(file_path):
         try:
