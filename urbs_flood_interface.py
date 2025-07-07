@@ -1037,7 +1037,7 @@ def main():
     st.set_page_config(
         page_title="WRM URBS Flood Model Interface",
         page_icon="./data/WRM_DROPLET.png",  # Path to your WRM favicon file
-        layout="wide",  # Can be "centered" or "wide"
+        layout="centered",  # Can be "centered" or "wide"
         initial_sidebar_state="expanded"
     )
     
