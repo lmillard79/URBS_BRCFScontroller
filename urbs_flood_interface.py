@@ -865,7 +865,8 @@ def get_available_ensembles_mc(data, aep, location, duration=None):
     return sorted(filtered[ensemble_col].dropna().unique())
 
 def show_home_page(data):
-    st.title("Welcome to the URBS Flood Model Interface")
+    st.title("Welcome")
+    st.subheader("A light-weight interface to the URBS model results")
     st.markdown("""
     This application provides a light-weight interface to run and analyse URBS flood models.
     
@@ -885,8 +886,8 @@ def show_home_page(data):
     
         # Example: Display a log file
     file_path = "data/frontpage.md"
-    st.subheader("A Guide to Using this Web Application Guide")
-    
+    st.subheader("An introduction to this Web Application")
+
     if os.path.exists(file_path):
         try:
             with open(file_path, 'r') as f:
