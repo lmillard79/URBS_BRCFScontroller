@@ -597,7 +597,7 @@ def show_design_event_ui():
                 default_loc_index = 0
             
             selected_location_display, selected_location_id = st.selectbox(
-                "Select Location:",
+                #LAM# "Select Location:",
                 options=available_locations,
                 index=default_loc_index,
                 format_func=lambda x: x[0],
@@ -989,6 +989,22 @@ def show_settings_page():
 )
     st.info("Application settings and user preferences will be configured here.")
 
+## LAM - added
+import json
+feedback_file = "feedback.json"
+
+# Function to save feedback to a JSON file
+def save_feedback(feedback_data):
+    try:
+        with open(feedback_file, "a") as f:
+            json.dump(feedback_data, f)
+            f.write(os.linesep)  # Add a newline for each entry
+        st.success("Feedback saved successfully!")
+    except Exception as e:
+        st.error(f"Error saving feedback: {e}")
+
+## LAM - end 
+
 def show_feedback_page():
     """Simple feedback form collecting an email and message and storing in session state."""
     st.header("User Feedback")
@@ -1006,6 +1022,7 @@ def show_feedback_page():
                 "email": email.strip(),
                 "feedback": feedback_text.strip(),
             }
+            save_feedback(entry)
             # Store feedback locally in session state for this run; could be replaced with persisting to DB/email.
             st.session_state.setdefault("submitted_feedback", []).append(entry)
             st.success("Thank you for your feedback! 🙌")
