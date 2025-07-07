@@ -1056,7 +1056,7 @@ def main():
     
     # Add logo to page
     add_logo_to_page()
-    st.logo("./data/WRM_POS.png", size = "large", link = "https://www.wrmwater.com.au", target="_blank")
+    st.logo("./data/WRM_POS.png", size = "large", link = "https://www.wrmwater.com.au")
     # Sidebar navigation
     st.sidebar.title("Navigation")
     page = st.sidebar.radio(
