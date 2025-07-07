@@ -597,7 +597,7 @@ def show_design_event_ui():
                 default_loc_index = 0
             
             selected_location_display, selected_location_id = st.selectbox(
-                #LAM# "Select Location:",
+                "Select Location:",
                 options=available_locations,
                 index=default_loc_index,
                 format_func=lambda x: x[0],
