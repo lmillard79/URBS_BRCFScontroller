@@ -949,6 +949,24 @@ def show_model_performance_page():
             st.error(f"An error occurred while reading the log file: {e}")
     else:
         st.warning(f"Log file not found at: {log_file_path}")
+        
+def show_quickstart_page():
+    st.header("QuickStart guide")
+    st.info("This page summarises the key concepts and usage cases.")
+    
+    # Example: Display a log file
+    qst_file_path = "data/quickstart.md"
+    st.subheader("QuickStart Guide")
+    
+    if os.path.exists(qst_file_path):
+        try:
+            with open(qst_file_path, 'r') as f:
+                qst_content = f.read()
+            st.code(qst_content, language='markdown')
+        except Exception as e:
+            st.error(f"An error occurred while reading the Quick Start guide file: {e}")
+    else:
+        st.warning(f"Quick Start guide file not found at: {qst_file_path}")
 
 def show_download_page():
     st.info("Options to download model results and exported data will be available here.")
@@ -1043,7 +1061,7 @@ def main():
     st.sidebar.title("Navigation")
     page = st.sidebar.radio(
         "Go to",
-        ["Home", "Historic Events", "Design Events", "Map", "Upload Data", "Model Performance", "Settings", "Feedback"]
+        ["Home", "Historic Events", "Design Events", "Map", "Upload Data", "Model Performance", "QuickStart Guide", "Settings", "Feedback"]
     )
     
     # Page routing
@@ -1069,6 +1087,8 @@ def main():
         show_upload_page()
     elif page == "Model Performance":
         show_model_performance_page()
+    elif page == "QuickStart Guide":
+        show_quickstart_page()
     elif page == "Settings":
         show_settings_page()
     elif page == "Feedback":
