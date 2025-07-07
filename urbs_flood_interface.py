@@ -394,13 +394,14 @@ def show_historic_event_ui(data, col1, col2):
             disabled=not st.session_state.get('historic_run_complete', False),
             type="primary",
         )
-
+        '''
         # Reset button
         if st.button("🔄 Reset Model", use_container_width=True, key="reset_historic"):
             st.session_state.show_historic_results = False
             st.session_state.historic_run_complete = False
             st.session_state.pop('historic_run_key', None)
             st.rerun()
+        '''
 
     with col2:
         st.header("Event Data Analysis")
@@ -664,9 +665,11 @@ def show_design_event_ui():
 
         st.button("✅ Export to TUFLOW", use_container_width=True, key="export_design", disabled=not st.session_state.get('show_results', False), type="primary")
         
+        '''''
         if st.button("🔄 Reset Model", use_container_width=True, key="reset_design"):
             st.session_state.show_results = False
             st.rerun()
+        '''
 
     with col2:
         st.header("Design Event Analysis")
