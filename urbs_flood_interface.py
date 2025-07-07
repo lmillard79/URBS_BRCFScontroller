@@ -956,7 +956,7 @@ def show_quickstart_page():
     
     # Example: Display a log file
     qst_file_path = "data/quickstart.md"
-    st.subheader("QuickStart Guide")
+    st.subheader("A Guide to Using this Web Application Guide")
     
     if os.path.exists(qst_file_path):
         try:
