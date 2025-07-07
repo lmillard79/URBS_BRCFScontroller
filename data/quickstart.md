@@ -1,9 +1,6 @@
+## 🚀 Getting Started
 
-# URBS BRCFScontroller - Streamlit Community Cloud Deployment Guide
-
-## 🚀 Quick Start Migration
-
-### Step 1: Convert Your Pickle Files to Parquet
+### Step 1: Convert Your URBS Text Files to Parquet
 
 1. **Run the conversion script** in your local environment:
    ```bash
@@ -30,10 +27,10 @@ your-repo/
 └── README.md
 ```
 
-### Step 3: Replace Your Main App File
+### Step 3: Run the Main App File
 
-Replace your current `urbs_flood_interface.py` with the optimized version provided. The new version:
-- ✅ Uses parquet files instead of pickle files
+The `urbs_flood_interface.py` is an optimised version for Community Cloud. The new version:
+- ✅ Uses parquet files instead of text files
 - ✅ Implements smart caching with TTL
 - ✅ Includes memory optimization
 - ✅ Provides progressive loading
@@ -42,7 +39,7 @@ Replace your current `urbs_flood_interface.py` with the optimized version provid
 
 ### Step 4: Update Requirements
 
-Replace your `requirements.txt` with the optimized version that includes:
+Create a virtual environment and pip install -r `requirements.txt` that are optimised to:
 - Minimal dependencies for Community Cloud
 - Parquet file support
 - Performance monitoring tools
@@ -70,7 +67,7 @@ Replace your `requirements.txt` with the optimized version that includes:
 
 ## 📊 Performance Comparison
 
-| Aspect | Original (Pickle) | Optimized (Parquet) |
+| Aspect | Original (Text) | Optimized (Parquet) |
 |--------|------------------|---------------------|
 | File Size | 100% | 30-50% |
 | Load Time | 100% | 60-80% |
@@ -164,12 +161,11 @@ Access via the sidebar "Performance Monitor" section.
 - Monitor app performance after deployment
 - Set up alerts for memory/performance issues
 
-## 🔄 Migration Checklist
+## 🔄 Checklist
 
-- [ ] Run pickle to parquet conversion script
+- [ ] Run textfile to parquet conversion script
 - [ ] Verify all data files converted successfully
-- [ ] Update main app file with optimized version
-- [ ] Update requirements.txt
+- [ ] Install requirements.txt
 - [ ] Test locally with new parquet files
 - [ ] Commit and push to repository
 - [ ] Deploy to Streamlit Community Cloud
@@ -199,11 +195,9 @@ If you encounter issues:
 
 ## 🎯 Expected Results
 
-After implementing these optimizations, you should see:
 - **50-70% reduction** in memory usage
 - **40-60% faster** data loading
 - **Improved responsiveness** on Community Cloud
 - **Better user experience** with progress indicators
 - **Robust error handling** for edge cases
 
-The optimized version maintains all your original functionality while being much more efficient for cloud deployment.

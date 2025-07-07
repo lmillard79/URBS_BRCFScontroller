@@ -576,7 +576,7 @@ def show_design_event_ui():
             except (ValueError, TypeError):
                 default_aep_index = 0
             selected_aep = st.selectbox(
-                "Select Annual Exceedance Probability (AEP):",
+                "Select AEP:",
                 options=available_aeps,
                 index=default_aep_index,
                 format_func=lambda x: f"1 in {int(x)} AEP" if x else "",
@@ -643,7 +643,7 @@ def show_design_event_ui():
         if model_key == 'design_MC':
             available_scenarios = get_available_climate_scenarios(data)
             if available_scenarios:
-                selected_climate_scenario = st.selectbox("Select Climate Scenario:", options=available_scenarios, key='climate_selector')
+                selected_climate_scenario = st.selectbox("Select Climate Pathway:", options=available_scenarios, key='climate_selector')
 
         # --- Determine current selection signature for change detection ---
         if model_key == 'design_MC':
@@ -881,8 +881,25 @@ def show_home_page(data):
     *This application is currently under development and more features are being added.*
     """)
     
-    st.header("Available Data")
-    st.warning("This Project Runs URBS Ensemble Design Events, Monte Carlo and Historic Flood events.")
+    ## st.header("Available Data")
+    
+        # Example: Display a log file
+    file_path = "data/frontpage.md"
+    st.subheader("A Guide to Using this Web Application Guide")
+    
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, 'r') as f:
+                content = f.read()
+            st.markdown(content)
+        except Exception as e:
+            st.error(f"An error occurred while reading the Front Page file: {e}")
+    else:
+        st.warning(f"Quick Start guide file not found at: {file_path}")
+    
+    
+    
+    
 
 
 def add_geospatial_to_map(m, file_path, layer_name=None):
