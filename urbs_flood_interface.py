@@ -962,7 +962,7 @@ def show_quickstart_page():
         try:
             with open(qst_file_path, 'r') as f:
                 qst_content = f.read()
-            st.code(qst_content, language='markdown', wrap_lines=True)
+            st.markdown(qst_content)
         except Exception as e:
             st.error(f"An error occurred while reading the Quick Start guide file: {e}")
     else:
