@@ -944,7 +944,7 @@ def show_model_performance_page():
         try:
             with open(log_file_path, 'r') as f:
                 log_content = f.read()
-            st.code(log_content, language='log')
+            st.markdown(log_content)
         except Exception as e:
             st.error(f"An error occurred while reading the log file: {e}")
     else:
