@@ -919,7 +919,7 @@ def show_map_page():
     st.header("Geospatial Map")
     st.info("This page will display geospatial flood data when available.")
     
-    # Create a basic map centered on Brisbane
+    # Create a basic map centred on Brisbane
     m = folium.Map(location=[-27.4698, 152.90], zoom_start=9)
 
     # --- Load all GeoJSON files from the geo folder ---

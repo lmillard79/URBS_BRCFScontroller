@@ -1,4 +1,4 @@
-# URBS BRCFS Control Dashboard
+# URBS BRCFS Dashboard
 
 A Streamlit-based dashboard for controlling inputs and outputs of the URBS BRCFS project.
 
@@ -20,7 +20,7 @@ streamlit run urbs_flood_interface.py
 
 ## Features
 - Input parameter controls
-- Output visualization
+- Output visualisation
 - Real-time parameter updates
 - Data export functionality
 

@@ -17,10 +17,10 @@
 Your repository should have this structure:
 ```
 your-repo/
-├── urbs_flood_interface.py (replace with optimized version)
-├── performance_utils.py (new file)
-├── requirements.txt (updated)
-├── data_parquet/ (new directory)
+├── urbs_flood_interface.py 
+├── performance_utils.py 
+├── requirements.txt 
+├── data_parquet/ 
 │   ├── your_data_file1.parquet
 │   ├── your_data_file2.parquet
 │   └── conversion_metadata.parquet
@@ -32,7 +32,7 @@ your-repo/
 The `urbs_flood_interface.py` is an optimised version for Community Cloud. The new version:
 - ✅ Uses parquet files instead of text files
 - ✅ Implements smart caching with TTL
-- ✅ Includes memory optimization
+- ✅ Includes memory optimisation
 - ✅ Provides progressive loading
 - ✅ Has performance monitoring
 - ✅ Maintains your original functionality
@@ -43,9 +43,9 @@ Create a virtual environment and pip install -r `requirements.txt` that are opti
 - Minimal dependencies for Community Cloud
 - Parquet file support
 - Performance monitoring tools
-- Memory optimization utilities
+- Memory optimisation utilities
 
-## 🛠️ Key Optimizations Implemented
+## 🛠️ Key Optimisations Implemented
 
 ### Memory Management
 - **Lazy Loading**: Data is only loaded when needed
@@ -53,7 +53,7 @@ Create a virtual environment and pip install -r `requirements.txt` that are opti
 - **Memory Monitoring**: Real-time memory usage tracking
 - **Garbage Collection**: Automatic cleanup after operations
 
-### Data Loading Optimization
+### Data Loading Optimisation
 - **Parquet Format**: 50-90% smaller file sizes than pickle
 - **Column Selection**: Load only needed columns
 - **Filtered Loading**: Apply filters before loading full dataset
@@ -67,7 +67,7 @@ Create a virtual environment and pip install -r `requirements.txt` that are opti
 
 ## 📊 Performance Comparison
 
-| Aspect | Original (Text) | Optimized (Parquet) |
+| Aspect | Original (Text) | Optimised (Parquet) |
 |--------|------------------|---------------------|
 | File Size | 100% | 30-50% |
 | Load Time | 100% | 60-80% |
@@ -115,7 +115,7 @@ python pickle_to_parquet_converter.py
 - Use smaller page sizes for data tables
 - Enable more aggressive filtering
 - Clear cache more frequently
-- Reduce the number of simultaneous visualizations
+- Reduce the number of simultaneous visualisations
 
 #### 3. Slow loading times
 **Solutions**:
@@ -143,7 +143,7 @@ Access via the sidebar "Performance Monitor" section.
 
 ### 1. Data Size Management
 - Keep individual parquet files under 100MB
-- Use filtering to reduce data before visualization
+- Use filtering to reduce data before visualisation
 - Implement pagination for large datasets
 
 ### 2. Memory Usage
@@ -176,13 +176,13 @@ Access via the sidebar "Performance Monitor" section.
 
 ### Regular Tasks
 - **Weekly**: Check memory usage and performance metrics
-- **Monthly**: Review and optimize cache settings
+- **Monthly**: Review and optimise cache settings
 - **Quarterly**: Update dependencies and review data structure
 
-### Performance Optimization
+### Performance Optimisation
 - Monitor the performance dashboard regularly
 - Adjust cache TTL based on usage patterns
-- Optimize data filters based on user behavior
+- Optimise data filters based on user behaviour
 - Consider data aggregation for frequently accessed summaries
 
 ## 🆘 Support
