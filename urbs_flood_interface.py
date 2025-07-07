@@ -665,11 +665,11 @@ def show_design_event_ui():
 
         st.button("✅ Export to TUFLOW", use_container_width=True, key="export_design", disabled=not st.session_state.get('show_results', False), type="primary")
         
-        '''
-        if st.button("🔄 Reset Model", use_container_width=True, key="reset_design"):
-            st.session_state.show_results = False
-            st.rerun()
-        '''
+        
+        #if st.button("🔄 Reset Model", use_container_width=True, key="reset_design"):
+        #    st.session_state.show_results = False
+        #    st.rerun()
+        
 
     with col2:
         st.header("Design Event Analysis")
