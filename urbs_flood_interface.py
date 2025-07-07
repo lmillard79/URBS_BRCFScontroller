@@ -394,14 +394,14 @@ def show_historic_event_ui(data, col1, col2):
             disabled=not st.session_state.get('historic_run_complete', False),
             type="primary",
         )
-        '''
+        
         # Reset button
-        if st.button("🔄 Reset Model", use_container_width=True, key="reset_historic"):
-            st.session_state.show_historic_results = False
-            st.session_state.historic_run_complete = False
-            st.session_state.pop('historic_run_key', None)
-            st.rerun()
-        '''
+        #if st.button("🔄 Reset Model", use_container_width=True, key="reset_historic"):
+        #    st.session_state.show_historic_results = False
+        #    st.session_state.historic_run_complete = False
+        #    st.session_state.pop('historic_run_key', None)
+        #    st.rerun()
+        
 
     with col2:
         st.header("Event Data Analysis")
