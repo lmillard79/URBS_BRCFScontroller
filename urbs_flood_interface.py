@@ -983,20 +983,21 @@ def show_map_page():
     rain_count = len(rain_geo.get("features", [])) if isinstance(rain_geo, dict) else 0
     st.info(f"River gauges returned: {river_count} | Rain gauges returned: {rain_count}")
 
-    folium.GeoJson(
-        river_geo,
-        name="River gauges",
-        tooltip=folium.GeoJsonTooltip(fields=["name", "state"], aliases=["Gauge", "State"]),
-        marker=folium.Marker(icon=folium.Icon(color="blue", icon="tint"))
-    ).add_to(m)
+    from folium.plugins import MarkerCluster
 
-    # Rain gauges layer
-    folium.GeoJson(
-        rain_geo,
-        name="Rain gauges",
-        tooltip=folium.GeoJsonTooltip(fields=["name", "state"], aliases=["Gauge", "State"]),
-        marker=folium.Marker(icon=folium.Icon(color="green", icon="cloud-rain"))
-    ).add_to(m)
+    river_cluster = MarkerCluster(name="River gauges").add_to(m)
+    for feat in river_geo.get("features", []):
+        lon, lat = feat["geometry"]["coordinates"]
+        props = feat.get("properties", {})
+        tooltip = f"{props.get('name','')}, {props.get('state','')}"
+        folium.Marker([lat, lon], tooltip=tooltip, icon=folium.Icon(color="blue", icon="tint")).add_to(river_cluster)
+
+    rain_cluster = MarkerCluster(name="Rain gauges").add_to(m)
+    for feat in rain_geo.get("features", []):
+        lon, lat = feat["geometry"]["coordinates"]
+        props = feat.get("properties", {})
+        tooltip = f"{props.get('name','')}, {props.get('state','')}"
+        folium.Marker([lat, lon], tooltip=tooltip, icon=folium.Icon(color="green", icon="cloud-rain")).add_to(rain_cluster)
 
     folium.LayerControl().add_to(m)
 
