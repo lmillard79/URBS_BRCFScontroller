@@ -920,7 +920,7 @@ def show_map_page():
     st.info("This page will display river and rain gauge locations when available.")
     
     # Create a basic map centred on Brisbane
-    m = folium.Map(location=[-27.480, 152.67], zoom_start=9)
+    m = folium.Map(location=[-27.480, 152.967], zoom_start=9)
 
     # --- Load all GeoJSON files from the geo folder ---
     geo_dir = "geo"
