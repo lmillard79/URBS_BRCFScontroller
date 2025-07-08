@@ -957,6 +957,22 @@ def show_map_page():
     m = folium.Map(location=ipswich_center, zoom_start=9)
     # Optionally show full bbox for context – comment out if not desired
     # m.fit_bounds([[brisbane_bbox[1], brisbane_bbox[0]], [brisbane_bbox[3], brisbane_bbox[2]]])
+    
+   """  folium.WmsTileLayer(
+    url="https://services.ga.gov.au/gis/services/National_Base_Map/MapServer/WMSServer",
+    layers="0",
+    format="image/png",
+    transparent=True,
+    name="GA Base Map",
+    overlay=False,
+    control=True
+    ).add_to(m) """
+    
+    from xyzservices import TileProvider  # optional, but helps with autocomplete
+
+    folium.TileLayer("CartoDB Positron", name="Carto Light", control=True).add_to(m)
+    folium.TileLayer("Esri.WorldImagery", name="ESRI Imagery", control=True).add_to(m)
+
     folium.TileLayer(
         tiles="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
         name="OpenTopoMap",
@@ -965,20 +981,7 @@ def show_map_page():
         control=True
     ).add_to(m)
 
-    folium.WmsTileLayer(
-    url="https://services.ga.gov.au/gis/services/National_Base_Map/MapServer/WMSServer",
-    layers="0",
-    format="image/png",
-    transparent=True,
-    name="GA Base Map",
-    overlay=False,
-    control=True
-    ).add_to(m)
-    
-    from xyzservices import TileProvider  # optional, but helps with autocomplete
 
-    folium.TileLayer("CartoDB Positron", name="Carto Light", control=True).add_to(m)
-    folium.TileLayer("Esri.WorldImagery", name="ESRI Imagery", control=True).add_to(m)
     
     # --- Load all GeoJSON files from the geo folder ---
     geo_dir = "geo"
