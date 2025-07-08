@@ -1192,12 +1192,14 @@ def main():
     # Clear any cached data
     st.cache_data.clear()
     
-    # Set page config with WRM favicon
+    # --- Page configuration with optional favicon ---
+    favicon_path = Path("data/WRM_DROPLET.png")
+    page_icon_arg = str(favicon_path) if favicon_path.is_file() else None
     st.set_page_config(
         page_title="WRM URBS Flood Model Interface",
-        page_icon="./data/WRM_DROPLET.png",  # Path to your WRM favicon file
-        layout="wide",  # Can be "centered" or "wide"
-        initial_sidebar_state="expanded"
+        page_icon=page_icon_arg,
+        layout="wide",  # "centered" or "wide"
+        initial_sidebar_state="expanded",
     )
     
     # Add custom CSS for favicon in case the above doesn't work
