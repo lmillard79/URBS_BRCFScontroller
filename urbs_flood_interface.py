@@ -964,6 +964,17 @@ def show_map_page():
         overlay=False,      # treat as a base layer
         control=True
     ).add_to(m)
+
+    folium.WmsTileLayer(
+    url="https://services.ga.gov.au/gis/services/National_Base_Map/MapServer/WMSServer",
+    layers="0",
+    format="image/png",
+    transparent=True,
+    name="GA Base Map",
+    overlay=False,
+    control=True
+    ).add_to(m)
+    
     # --- Load all GeoJSON files from the geo folder ---
     geo_dir = "geo"
     if os.path.exists(geo_dir) and os.path.isdir(geo_dir):
