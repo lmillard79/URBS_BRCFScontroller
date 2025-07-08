@@ -937,16 +937,9 @@ def fetch_gauge_layer(layer: int, bbox: Optional[Tuple[float, float, float, floa
         xmin, ymin, xmax, ymax = bbox
         params.update(
             {
-                "geometry": json.dumps(
-                    {
-                        "xmin": xmin,
-                        "ymin": ymin,
-                        "xmax": xmax,
-                        "ymax": ymax,
-                        "spatialReference": {"wkid": 4326},
-                    }
-                ),
+                "geometry": f"{xmin},{ymin},{xmax},{ymax}",
                 "geometryType": "esriGeometryEnvelope",
+                "inSR": 4326,
                 "spatialRel": "esriSpatialRelIntersects",
             }
         )
