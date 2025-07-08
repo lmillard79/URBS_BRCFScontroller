@@ -939,6 +939,25 @@ def show_map_page():
     
     folium.LayerControl().add_to(m)
 
+    base = "https://hosting-stg.wsapi-stg.cloud.bom.gov.au/arcgis/rest/services/" \
+       "flood/National_Flood_Gauge_Network/MapServer/5/query"
+    params = {
+        "where": "1=1",          # all features – filter as needed
+        "outFields": "*",        # attributes to return
+        "outSR": 4326,           # spatial reference (lat/lon)
+        "f": "geojson"
+    }
+    geo = requests.get(base, params=params, timeout=30).json()
+
+    folium.GeoJson(
+        geo,
+        name="Flood gauges",
+        tooltip=folium.GeoJsonTooltip(fields=["GAUGE_NAME", "RIVER"]),
+        marker=folium.Icon(color="blue", icon="tint")
+    ).add_to(m)
+
+    folium.LayerControl().add_to(m)
+
     # Display the map
     st_folium(m, width=1500, height=600)
 
