@@ -957,7 +957,13 @@ def show_map_page():
     m = folium.Map(location=ipswich_center, zoom_start=9)
     # Optionally show full bbox for context – comment out if not desired
     # m.fit_bounds([[brisbane_bbox[1], brisbane_bbox[0]], [brisbane_bbox[3], brisbane_bbox[2]]])
-
+    folium.TileLayer(
+        tiles="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+        name="OpenTopoMap",
+        attr="&copy; OpenTopoMap contributors, CC-BY-SA",
+        overlay=False,      # treat as a base layer
+        control=True
+    ).add_to(m)
     # --- Load all GeoJSON files from the geo folder ---
     geo_dir = "geo"
     if os.path.exists(geo_dir) and os.path.isdir(geo_dir):
