@@ -976,7 +976,12 @@ def show_map_page():
 
     # Fetch river and rain gauges within Brisbane bbox
     river_geo = fetch_gauge_layer(5)#, brisbane_bbox)
-    rain_geo = fetch_gauge_layer(4) #, brisbane_bbox)
+    rain_geo = fetch_gauge_layer(4)  #, brisbane_bbox)
+
+    # Debug output
+    river_count = len(river_geo.get("features", [])) if isinstance(river_geo, dict) else 0
+    rain_count = len(rain_geo.get("features", [])) if isinstance(rain_geo, dict) else 0
+    st.info(f"River gauges returned: {river_count} | Rain gauges returned: {rain_count}")
 
     folium.GeoJson(
         river_geo,
