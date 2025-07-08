@@ -947,15 +947,14 @@ def fetch_gauge_layer(layer: int, bbox: Optional[Tuple[float, float, float, floa
 
 def show_map_page():
     st.header("Geospatial Map")
-    st.info("This page will display river and rain gauge locations when available.")
+    st.info("This page displays river gauge locations (rain gauges hidden).")
     
-    # Brisbane bounding box (lon/lat)
-    brisbane_bbox = (152.8, -28.0, 153.4, -27.0)
+    # SE QLD bbox including Toowoomba (lon/lat)
+    brisbane_bbox = (151.5, -28.5, 153.4, -26.8)
 
     # Create a map and zoom to Brisbane
-    m = folium.Map(zoom_start=9)
+    m = folium.Map(zoom_start=8)
     m.fit_bounds([[brisbane_bbox[1], brisbane_bbox[0]], [brisbane_bbox[3], brisbane_bbox[2]]])
-    m = folium.Map(location=[-27.480, 152.99], zoom_start=9)
 
     # --- Load all GeoJSON files from the geo folder ---
     geo_dir = "geo"
@@ -976,39 +975,23 @@ def show_map_page():
 
     # Fetch river and rain gauges within Brisbane bbox
     river_geo = fetch_gauge_layer(5, brisbane_bbox)
-    rain_geo = fetch_gauge_layer(4, brisbane_bbox)
+    # rain gauges disabled
 
     # Debug output
     river_count = len(river_geo.get("features", [])) if isinstance(river_geo, dict) else 0
-    rain_count = len(rain_geo.get("features", [])) if isinstance(rain_geo, dict) else 0
-    st.info(f"River gauges returned: {river_count} | Rain gauges returned: {rain_count}")
+    st.info(f"River gauges returned: {river_count}")
 
     # Using simple CircleMarker for ~<500 points for clarity
-    
-
     for feat in river_geo.get("features", []):
         lon, lat = feat["geometry"]["coordinates"]
         folium.CircleMarker(
             location=[lat, lon],
-            radius=5,
+            radius=3,
             color="blue",
             fill=True,
             fill_opacity=0.8,
             popup=feat["properties"].get("name", "")
         ).add_to(m)
-
-    for feat in rain_geo.get("features", []):
-        lon, lat = feat["geometry"]["coordinates"]
-        folium.CircleMarker(
-            location=[lat, lon],
-            radius=5,
-            color="green",
-            fill=True,
-            fill_opacity=0.8,
-            popup=feat["properties"].get("name", "")
-        ).add_to(m)
-
-    folium.LayerControl().add_to(m)
 
     # Display the map
     st_folium(m, width=1500, height=600)
