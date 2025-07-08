@@ -975,6 +975,11 @@ def show_map_page():
     control=True
     ).add_to(m)
     
+    from xyzservices import TileProvider  # optional, but helps with autocomplete
+
+    folium.TileLayer("CartoDB Positron", name="Carto Light", control=True).add_to(m)
+    folium.TileLayer("Esri.WorldImagery", name="ESRI Imagery", control=True).add_to(m)
+    
     # --- Load all GeoJSON files from the geo folder ---
     geo_dir = "geo"
     if os.path.exists(geo_dir) and os.path.isdir(geo_dir):
