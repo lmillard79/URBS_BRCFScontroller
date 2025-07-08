@@ -948,13 +948,13 @@ def show_map_page():
         "outSR": 4326,           # spatial reference (lat/lon)
         "f": "geojson"
     }
-    geo = requests.get(base, params=params, timeout=30).json()
+    geo = requests.get(base, params=params, timeout=60).json()
 
     folium.GeoJson(
         geo,
         name="Flood gauges",
         tooltip=folium.GeoJsonTooltip(fields=["GAUGE_NAME", "RIVER"]),
-        marker=folium.Icon(color="blue", icon="tint")
+        marker=folium.Marker(icon=folium.Icon(color="blue", icon="tint"))
     ).add_to(m)
 
     folium.LayerControl().add_to(m)
