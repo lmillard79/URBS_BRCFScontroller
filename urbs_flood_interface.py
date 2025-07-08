@@ -10,6 +10,7 @@ import base64
 import os
 import requests
 from pathlib import Path
+import hashlib
 import folium
 import altair as alt
 from streamlit_folium import st_folium
@@ -918,14 +919,27 @@ def add_geospatial_to_map(m, file_path, layer_name=None):
 
 import json
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def fetch_gauge_layer(layer: int, bbox: Optional[Tuple[float, float, float, float]] = None) -> Dict[str, Any]:
-    """Fetch gauge layer (river=5, rain=4) as GeoJSON from BoM service.
-    If *bbox* is provided it should be (min_lon, min_lat, max_lon, max_lat).
+@st.cache_data(show_spinner=False)
+def fetch_gauge_layer(
+    layer: int,
+    bbox: Optional[Tuple[float, float, float, float]] = None,
+    ttl_hours: int = 24,
+) -> Dict[str, Any]:
+    """Fetch gauge layer (river=5, rain=4) from the BoM ArcGIS service as GeoJSON.
+
+    A two-tier cache is used:
+    1. Streamlit's in-memory cache (handled by ``@st.cache_data``).
+    2. A persistent disk cache under ``.cache/`` so that data survives app
+       restarts and network outages.
+
+    If the remote service times out, a cached copy will be returned (even if it
+    is older than *ttl_hours*) so that the UI remains responsive.
     """
+    import json, time, hashlib
+
     base = (
         "https://hosting-stg.wsapi-stg.cloud.bom.gov.au/arcgis/rest/services/"
-        "flood/National_Flood_Gauge_Network/MapServer/{}/query".format(layer)
+        f"flood/National_Flood_Gauge_Network/MapServer/{layer}/query"
     )
     params = {
         "where": "1=1",
@@ -943,7 +957,41 @@ def fetch_gauge_layer(layer: int, bbox: Optional[Tuple[float, float, float, floa
                 "spatialRel": "esriSpatialRelIntersects",
             }
         )
-    return requests.get(base, params=params, timeout=60).json()
+
+    # --- Persistent disk cache setup ---
+    cache_dir = Path(".cache")
+    cache_dir.mkdir(exist_ok=True)
+    bbox_key = "global" if bbox is None else "_".join(map(str, bbox))
+    cache_file = cache_dir / f"gauge_layer_{layer}_{hashlib.md5(bbox_key.encode()).hexdigest()}.geojson"
+
+    # Serve from disk cache if it is still fresh enough
+    if cache_file.exists():
+        age_hours = (time.time() - cache_file.stat().st_mtime) / 3600
+        if age_hours < ttl_hours:
+            try:
+                with cache_file.open("r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                # Corrupted cache – ignore and fetch afresh
+                pass
+
+    # Fallback to remote request
+    try:
+        resp = requests.get(base, params=params, timeout=60)
+        resp.raise_for_status()
+        data = resp.json()
+        # Save to disk cache for future runs
+        with cache_file.open("w", encoding="utf-8") as f:
+            json.dump(data, f)
+        return data
+    except (requests.exceptions.Timeout, requests.exceptions.RequestException) as e:
+        # If remote fails, use any (even stale) cached copy if available
+        if cache_file.exists():
+            with cache_file.open("r", encoding="utf-8") as f:
+                return json.load(f)
+        # Ultimately give up but keep the app alive
+        print(f"Error fetching gauge layer: {e}")
+        return {}
 
 def show_map_page():
     st.header("Geospatial Map")
