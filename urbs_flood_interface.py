@@ -958,7 +958,8 @@ def show_map_page():
     # Optionally show full bbox for context – comment out if not desired
     # m.fit_bounds([[brisbane_bbox[1], brisbane_bbox[0]], [brisbane_bbox[3], brisbane_bbox[2]]])
     
-   """  folium.WmsTileLayer(
+    """
+    folium.WmsTileLayer(
     url="https://services.ga.gov.au/gis/services/National_Base_Map/MapServer/WMSServer",
     layers="0",
     format="image/png",
