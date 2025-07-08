@@ -997,7 +997,7 @@ def show_map_page():
         ).add_to(m)
 
     # Display the map (explicit centre so Streamlit doesn’t override)
-    st_folium(m, width=1500, height=600, center=[-27.62, 152.76], zoom=9)
+    st_folium(m, width=1200, height=600, center=[-27.62, 152.76], zoom=9)
 
 
 def show_upload_page():
