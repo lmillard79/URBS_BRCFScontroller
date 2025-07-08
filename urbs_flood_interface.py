@@ -919,13 +919,13 @@ def add_geospatial_to_map(m, file_path, layer_name=None):
 import json
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def fetch_flood_gauges(bbox: Optional[Tuple[float, float, float, float]] = None) -> Dict[str, Any]:
-    """Fetch flood gauge GeoJSON from BoM service.
+def fetch_gauge_layer(layer: int, bbox: Optional[Tuple[float, float, float, float]] = None) -> Dict[str, Any]:
+    """Fetch gauge layer (river=5, rain=4) as GeoJSON from BoM service.
     If *bbox* is provided it should be (min_lon, min_lat, max_lon, max_lat).
     """
     base = (
         "https://hosting-stg.wsapi-stg.cloud.bom.gov.au/arcgis/rest/services/"
-        "flood/National_Flood_Gauge_Network/MapServer/5/query"
+        "flood/National_Flood_Gauge_Network/MapServer/{}/query".format(layer)
     )
     params = {
         "where": "1=1",
@@ -981,14 +981,23 @@ def show_map_page():
     
     folium.LayerControl().add_to(m)
 
-    # Fetch gauges intersecting the Brisbane bbox only
-    geo = fetch_flood_gauges(brisbane_bbox)
+    # Fetch river and rain gauges within Brisbane bbox
+    river_geo = fetch_gauge_layer(5, brisbane_bbox)
+    rain_geo = fetch_gauge_layer(4, brisbane_bbox)
 
     folium.GeoJson(
-        geo,
-        name="Flood gauges",
+        river_geo,
+        name="River gauges",
         tooltip=folium.GeoJsonTooltip(fields=["name", "state"], aliases=["Gauge", "State"]),
         marker=folium.Marker(icon=folium.Icon(color="blue", icon="tint"))
+    ).add_to(m)
+
+    # Rain gauges layer
+    folium.GeoJson(
+        rain_geo,
+        name="Rain gauges",
+        tooltip=folium.GeoJsonTooltip(fields=["name", "state"], aliases=["Gauge", "State"]),
+        marker=folium.Marker(icon=folium.Icon(color="green", icon="cloud-rain"))
     ).add_to(m)
 
     folium.LayerControl().add_to(m)
