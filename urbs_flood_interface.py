@@ -1009,8 +1009,8 @@ def show_map_page():
    
     from xyzservices import TileProvider  # optional, but helps with autocomplete
 
-    folium.TileLayer("CartoDB Positron", name="Carto Light", control=True).add_to(m)
-    folium.TileLayer("Esri.WorldImagery", name="ESRI Imagery", control=True).add_to(m)
+    folium.TileLayer("CartoDB Positron", name="Carto Light", control=True, show=False).add_to(m)
+    folium.TileLayer("Esri.WorldImagery", name="ESRI Imagery", control=True, show=False).add_to(m)
 
     folium.TileLayer(
         tiles="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
