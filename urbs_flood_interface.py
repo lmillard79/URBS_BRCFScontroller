@@ -958,17 +958,7 @@ def show_map_page():
     # Optionally show full bbox for context – comment out if not desired
     # m.fit_bounds([[brisbane_bbox[1], brisbane_bbox[0]], [brisbane_bbox[3], brisbane_bbox[2]]])
     
-    """
-    folium.WmsTileLayer(
-    url="https://services.ga.gov.au/gis/services/National_Base_Map/MapServer/WMSServer",
-    layers="0",
-    format="image/png",
-    transparent=True,
-    name="GA Base Map",
-    overlay=False,
-    control=True
-    ).add_to(m) """
-    
+   
     from xyzservices import TileProvider  # optional, but helps with autocomplete
 
     folium.TileLayer("CartoDB Positron", name="Carto Light", control=True).add_to(m)
