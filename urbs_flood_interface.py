@@ -8,6 +8,7 @@ import re
 import datetime
 import base64
 import os
+import requests
 from pathlib import Path
 import folium
 import altair as alt
