@@ -952,9 +952,11 @@ def show_map_page():
     # SE QLD bbox including Toowoomba (lon/lat)
     brisbane_bbox = (151.5, -28.5, 153.4, -26.8)
 
-    # Create a map and zoom to Brisbane
-    m = folium.Map(zoom_start=8)
-    m.fit_bounds([[brisbane_bbox[1], brisbane_bbox[0]], [brisbane_bbox[3], brisbane_bbox[2]]])
+    # Create map centred on Ipswich (approx) and still show wider SE QLD
+    ipswich_center = [-27.62, 152.76]
+    m = folium.Map(location=ipswich_center, zoom_start=9)
+    # Optionally show full bbox for context – comment out if not desired
+    # m.fit_bounds([[brisbane_bbox[1], brisbane_bbox[0]], [brisbane_bbox[3], brisbane_bbox[2]]])
 
     # --- Load all GeoJSON files from the geo folder ---
     geo_dir = "geo"
@@ -993,8 +995,8 @@ def show_map_page():
             popup=feat["properties"].get("name", "")
         ).add_to(m)
 
-    # Display the map
-    st_folium(m, width=1500, height=600)
+    # Display the map (explicit centre so Streamlit doesn’t override)
+    st_folium(m, width=1500, height=600, center=[-27.62, 152.76], zoom=9)
 
 
 def show_upload_page():
