@@ -916,11 +916,52 @@ def add_geospatial_to_map(m, file_path, layer_name=None):
         st.warning(f"Could not load {file_path}: {e}")
         return False
 
+import json
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_flood_gauges(bbox: Optional[Tuple[float, float, float, float]] = None) -> Dict[str, Any]:
+    """Fetch flood gauge GeoJSON from BoM service.
+    If *bbox* is provided it should be (min_lon, min_lat, max_lon, max_lat).
+    """
+    base = (
+        "https://hosting-stg.wsapi-stg.cloud.bom.gov.au/arcgis/rest/services/"
+        "flood/National_Flood_Gauge_Network/MapServer/5/query"
+    )
+    params = {
+        "where": "1=1",
+        "outFields": "*",
+        "outSR": 4326,
+        "f": "geojson",
+    }
+    if bbox:
+        xmin, ymin, xmax, ymax = bbox
+        params.update(
+            {
+                "geometry": json.dumps(
+                    {
+                        "xmin": xmin,
+                        "ymin": ymin,
+                        "xmax": xmax,
+                        "ymax": ymax,
+                        "spatialReference": {"wkid": 4326},
+                    }
+                ),
+                "geometryType": "esriGeometryEnvelope",
+                "spatialRel": "esriSpatialRelIntersects",
+            }
+        )
+    return requests.get(base, params=params, timeout=60).json()
+
 def show_map_page():
     st.header("Geospatial Map")
     st.info("This page will display river and rain gauge locations when available.")
     
-    # Create a basic map centred on Brisbane
+    # Brisbane bounding box (lon/lat)
+    brisbane_bbox = (152.8, -28.0, 153.4, -27.0)
+
+    # Create a map and zoom to Brisbane
+    m = folium.Map(zoom_start=9)
+    m.fit_bounds([[brisbane_bbox[1], brisbane_bbox[0]], [brisbane_bbox[3], brisbane_bbox[2]]])
     m = folium.Map(location=[-27.480, 152.99], zoom_start=9)
 
     # --- Load all GeoJSON files from the geo folder ---
@@ -940,20 +981,13 @@ def show_map_page():
     
     folium.LayerControl().add_to(m)
 
-    base = "https://hosting-stg.wsapi-stg.cloud.bom.gov.au/arcgis/rest/services/" \
-       "flood/National_Flood_Gauge_Network/MapServer/5/query"
-    params = {
-        "where": "1=1",          # all features – filter as needed
-        "outFields": "*",        # attributes to return
-        "outSR": 4326,           # spatial reference (lat/lon)
-        "f": "geojson"
-    }
-    geo = requests.get(base, params=params, timeout=60).json()
+    # Fetch gauges intersecting the Brisbane bbox only
+    geo = fetch_flood_gauges(brisbane_bbox)
 
     folium.GeoJson(
         geo,
         name="Flood gauges",
-        tooltip=folium.GeoJsonTooltip(fields=["GAUGE_NAME", "RIVER"]),
+        tooltip=folium.GeoJsonTooltip(fields=["name", "state"], aliases=["Gauge", "State"]),
         marker=folium.Marker(icon=folium.Icon(color="blue", icon="tint"))
     ).add_to(m)
 
