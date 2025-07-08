@@ -950,7 +950,7 @@ def show_map_page():
     st.info("This page displays river gauge locations (rain gauges hidden).")
     
     # SE QLD bbox including Toowoomba (lon/lat)
-    brisbane_bbox = (151.5, -28.5, 153.4, -26.8)
+    brisbane_bbox = (151.5, -28.5, 153.4, -26.5)
 
     # Create map centred on Ipswich (approx) and still show wider SE QLD
     ipswich_center = [-27.62, 152.76]
