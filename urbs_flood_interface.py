@@ -983,13 +983,30 @@ def show_map_page():
     rain_count = len(rain_geo.get("features", [])) if isinstance(rain_geo, dict) else 0
     st.info(f"River gauges returned: {river_count} | Rain gauges returned: {rain_count}")
 
-    from folium.plugins import FastMarkerCluster
+    # Using simple CircleMarker for ~<500 points for clarity
+    
 
-    river_points = [[lat, lon] for lon, lat in (f["geometry"]["coordinates"] for f in river_geo.get("features", []))]
-    FastMarkerCluster(river_points, name="River gauges").add_to(m)
+    for feat in river_geo.get("features", []):
+        lon, lat = feat["geometry"]["coordinates"]
+        folium.CircleMarker(
+            location=[lat, lon],
+            radius=5,
+            color="blue",
+            fill=True,
+            fill_opacity=0.8,
+            popup=feat["properties"].get("name", "")
+        ).add_to(m)
 
-    rain_points = [[lat, lon] for lon, lat in (f["geometry"]["coordinates"] for f in rain_geo.get("features", []))]
-    FastMarkerCluster(rain_points, name="Rain gauges", options={"iconCreateFunction": None}).add_to(m)
+    for feat in rain_geo.get("features", []):
+        lon, lat = feat["geometry"]["coordinates"]
+        folium.CircleMarker(
+            location=[lat, lon],
+            radius=5,
+            color="green",
+            fill=True,
+            fill_opacity=0.8,
+            popup=feat["properties"].get("name", "")
+        ).add_to(m)
 
     folium.LayerControl().add_to(m)
 
