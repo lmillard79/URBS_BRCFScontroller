@@ -917,7 +917,7 @@ def add_geospatial_to_map(m, file_path, layer_name=None):
 
 def show_map_page():
     st.header("Geospatial Map")
-    st.info("This page will display geospatial flood data when available.")
+    st.info("This page will display river and rain gauge locations when available.")
     
     # Create a basic map centred on Brisbane
     m = folium.Map(location=[-27.4698, 152.98, zoom_start=9)
@@ -1099,7 +1099,7 @@ def main():
     st.sidebar.title("Navigation")
     page = st.sidebar.radio(
         "Go to",
-        ["Home", "Historic Events", "Design Events", "Map", "Upload Data", "Model Performance", "QuickStart Guide", "Settings", "Feedback"]
+        ["Home", "Historic Events", "Design Events", "Map", "Model Performance", "QuickStart Guide", "Settings", "Feedback"]
     )
     
     # Page routing
@@ -1121,8 +1121,8 @@ def main():
         show_design_event_ui()
     elif page == "Map":
         show_map_page()
-    elif page == "Upload Data":
-        show_upload_page()
+    #elif page == "Upload Data":
+    #    show_upload_page()
     elif page == "Model Performance":
         show_model_performance_page()
     elif page == "QuickStart Guide":
