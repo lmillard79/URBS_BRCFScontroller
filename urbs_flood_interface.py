@@ -992,7 +992,8 @@ def show_map_page():
             color="blue",
             fill=True,
             fill_opacity=0.8,
-            popup=feat["properties"].get("name", "")
+            popup=feat["properties"].get("name", ""),
+            tooltip=feat["properties"].get("name", "")
         ).add_to(m)
 
     # Display the map (explicit centre so Streamlit doesn’t override)
